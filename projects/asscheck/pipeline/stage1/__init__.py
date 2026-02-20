@@ -1,5 +1,13 @@
 from .geometry import BlenderContext, GeometryConfig, MeshObject, check_geometry
 from .uv import UVBlenderContext, UVConfig, UVMeshObject, check_uvs
+from .texture import (
+    ImageTextureNode,
+    TextureBlenderContext,
+    TextureConfig,
+    TextureImage,
+    TextureMaterial,
+    check_textures,
+)
 
 __all__ = [
     "BlenderContext",
@@ -10,4 +18,10 @@ __all__ = [
     "UVConfig",
     "UVMeshObject",
     "check_uvs",
+    "ImageTextureNode",
+    "TextureBlenderContext",
+    "TextureConfig",
+    "TextureImage",
+    "TextureMaterial",
+    "check_textures",
 ]
