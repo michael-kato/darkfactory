@@ -149,11 +149,15 @@ venv.bak/
 .claude/runs/
 .claude/test-status
 
-# Unity generated directories (per-project)
-projects/*/Library/
-projects/*/Temp/
-projects/*/obj/
-projects/*/Logs/
+# Unity generated directories (per-project, any nesting depth)
+projects/**/Library/
+projects/**/Temp/
+projects/**/obj/
+projects/**/Logs/
+projects/**/UserSettings/
+projects/**/*.csproj
+projects/**/*.sln
+projects/**/*.slnx
 
 # Spyder project settings
 .spyderproject
