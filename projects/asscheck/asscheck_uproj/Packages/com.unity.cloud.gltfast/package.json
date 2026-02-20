@@ -1,0 +1,42 @@
+{
+  "name": "com.unity.cloud.gltfast",
+  "version": "6.16.0",
+  "displayName": "Unity glTFast",
+  "description": "Use glTFast to import and export glTF 3D files efficiently at runtime or in the Editor",
+  "unity": "2022.3",
+  "keywords": [
+    "mesh",
+    "gltf",
+    "asset",
+    "format",
+    "draco",
+    "ktx",
+    "basis",
+    "universal",
+    "basisu"
+  ],
+  "dependencies": {
+    "com.unity.modules.jsonserialize": "1.0.0",
+    "com.unity.modules.unitywebrequest": "1.0.0",
+    "com.unity.mathematics": "1.2.6",
+    "com.unity.burst": "1.8.24",
+    "com.unity.collections": "1.2.4"
+  },
+  "relatedPackages": {
+    "com.unity.cloud.gltfast.tests": "0.0.0"
+  },
+  "unityRelease": "67f2",
+  "_upm": {
+    "changelog": "### Added\n- [GltfAsset](xref:GLTFast.GltfAsset) property setters to allow change of behavior from script.\n  - [PlayAutomatically](xref:GLTFast.GltfAsset.PlayAutomatically).\n  - [SceneId](xref:GLTFast.GltfAsset.SceneId).\n- HDRP material validation (fixes [#561](https://github.com/atteneder/glTFast/issues/561)).\n- Various overridable shader loading methods to [MaterialGenerator](xref:GLTFast.Materials.MaterialGenerator)-based classes so users can customize shader lookup. This is useful when working with Addressables (fixes [#715](https://github.com/atteneder/glTFast/issues/715)).\n  - [MaterialGenerator.FindShader](xref:GLTFast.Materials.MaterialGenerator.FindShader(System.String)) for generic, runtime shader resolution.\n  - [BuiltInMaterialGenerator.FindShaderMetallicRoughness](xref:GLTFast.Materials.BuiltInMaterialGenerator.FindShaderMetallicRoughness).\n  - [BuiltInMaterialGenerator.FindShaderSpecularGlossiness](xref:GLTFast.Materials.BuiltInMaterialGenerator.FindShaderSpecularGlossiness).\n  - [BuiltInMaterialGenerator.FindShaderUnlit](xref:GLTFast.Materials.BuiltInMaterialGenerator.FindShaderUnlit).\n  - [ShaderGraphMaterialGenerator.LoadShaderByName](xref:GLTFast.Materials.ShaderGraphMaterialGenerator.LoadShaderByName(System.String)).\n\n### Fixed\n- Emission color (emissiveFactor) is now in correct color space for shader graphs and built-in shaders.\n- Normal map scale on shader graphs.\n- (Export) Avoid creating empty ORM textures if no smoothness texture is assigned (fixes [#801](https://github.com/atteneder/glTFast/issues/801)).\n\n### Deprecated\n- Access to glTF images via [IGltfReadable.ImageCount](xref:GLTFast.IGltfReadable.ImageCount) and [IGltfReadable.GetImage](xref:GLTFast.IGltfReadable.GetImage*). This has not been used internally and was unreliable. Please access glTF textures instead (see [TextureCount](xref:GLTFast.IGltfReadable.TextureCount) and [GetTexture](xref:GLTFast.IGltfReadable.GetTexture*))."
+  },
+  "upmCi": {
+    "footprint": "5dcac3f9a7a95523b52853a97dbc2d28c4f24692"
+  },
+  "documentationUrl": "https://docs.unity3d.com/Packages/com.unity.cloud.gltfast@6.16/manual/index.html",
+  "repository": {
+    "url": "https://github.cds.internal.unity3d.com/unity/com.unity.cloud.gltfast.src.git",
+    "type": "git",
+    "revision": "385b9c69310c640c28293bed0c73f75e120212a6"
+  },
+  "_fingerprint": "126b20060ad62f08a66b6b4e4a20998d06580dff"
+}

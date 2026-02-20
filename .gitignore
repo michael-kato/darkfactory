@@ -138,11 +138,22 @@ celerybeat.pid
 .env
 .envrc
 .venv
+projects/*/.venv
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+
+# darkfactory — factory runtime state
+.claude/runs/
+.claude/test-status
+
+# Unity generated directories (per-project)
+projects/*/Library/
+projects/*/Temp/
+projects/*/obj/
+projects/*/Logs/
 
 # Spyder project settings
 .spyderproject
