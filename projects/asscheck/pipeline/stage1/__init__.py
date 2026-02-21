@@ -16,6 +16,14 @@ from .armature import (
     SkinnedMesh,
     check_armature,
 )
+from .scene import (
+    SceneArmatureObject,
+    SceneBlenderContext,
+    SceneConfig,
+    SceneImage,
+    SceneMeshObject,
+    check_scene,
+)
 
 __all__ = [
     "BlenderContext",
@@ -38,4 +46,10 @@ __all__ = [
     "ArmatureObject",
     "SkinnedMesh",
     "check_armature",
+    "SceneArmatureObject",
+    "SceneBlenderContext",
+    "SceneConfig",
+    "SceneImage",
+    "SceneMeshObject",
+    "check_scene",
 ]
