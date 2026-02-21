@@ -3,7 +3,7 @@
 ## Goal
 File-system-level validation that runs before Blender opens anything. Validates format,
 checks size, assigns a unique asset ID, logs metadata, and initialises the QA report.
-Invalid assets are rejected or quarantined here before any expensive processing begins.
+Invalid assets are rejected here before any expensive processing begins.
 
 ## Depends On
 - `stage0-qa-schema.md` (pipeline/schema.py must exist)
@@ -50,17 +50,26 @@ Invalid assets are rejected or quarantined here before any expensive processing 
     prints the intake stage result as JSON and exits 0 on pass, 1 on fail.
 
 ## Tests (`tests/test_stage0_intake.py`)
-- Valid `.gltf` file → `StageStatus.PASS`, asset_id is a non-empty string
-- Valid `.glb` file → passes
-- `.fbx` file → passes
-- `.obj` file → passes
-- `.blend` file → `StageStatus.FAIL`
-- `.zip` file → `StageStatus.FAIL`
+
+Define at the top of the test file:
+```python
+ASSETS_DIR = Path(__file__).parent.parent / "assets"
+```
+
+Use real assets from `assets/` for format tests — do not create fake stubs for accepted formats:
+
+- Valid `.gltf` → `ASSETS_DIR / "street_lamp_01.gltf"` → `StageStatus.PASS`, asset_id is a non-empty string
+- Valid `.glb`  → `ASSETS_DIR / "large_iron_gate_left_door.glb"` → `StageStatus.PASS`
+- Valid `.fbx`  → `ASSETS_DIR / "tree_small_02_branches.fbx"` → `StageStatus.PASS`
+- Valid `.obj`  → `ASSETS_DIR / "double_door_standard_01.obj"` → `StageStatus.PASS`
+- `.blend` file (tmp_path stub) → `StageStatus.FAIL`
+- `.zip` file (tmp_path stub) → `StageStatus.FAIL`
 - Non-existent path → `StageStatus.FAIL`
-- File exceeding `hard_max_bytes` → `StageStatus.FAIL`
-- File exceeding category limit but under hard max → `StageStatus.PASS` with a WARNING check
-- Two runs on the same file produce different asset IDs
-- Use the existing sample: `asscheck_uproj/Assets/Models/street_lamp_01_quant.gltf`
+- File exceeding `hard_max_bytes` → `ASSETS_DIR / "tree_small_02_branches.fbx"` (≈114 MB) with `hard_max_bytes=50 * 1024 * 1024` → `StageStatus.FAIL`
+- File exceeding category limit but under hard max → same FBX with `max_size_bytes={"*": 50 * 1024 * 1024}` and `hard_max_bytes=200 * 1024 * 1024` → `StageStatus.PASS` with a WARNING on the `file_size` check
+- Two runs on the same file produce different asset IDs → `ASSETS_DIR / "street_lamp_01.gltf"`
+
+All tests must skip (not fail) if `ASSETS_DIR` does not exist, so the suite can run in CI without the binary assets present.
 
 ## Out of Scope
 - Deduplication by content hash (future)
