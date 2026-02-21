@@ -8,6 +8,14 @@ from .texture import (
     TextureMaterial,
     check_textures,
 )
+from .armature import (
+    ArmatureBlenderContext,
+    ArmatureBone,
+    ArmatureConfig,
+    ArmatureObject,
+    SkinnedMesh,
+    check_armature,
+)
 
 __all__ = [
     "BlenderContext",
@@ -24,4 +32,10 @@ __all__ = [
     "TextureImage",
     "TextureMaterial",
     "check_textures",
+    "ArmatureBlenderContext",
+    "ArmatureBone",
+    "ArmatureConfig",
+    "ArmatureObject",
+    "SkinnedMesh",
+    "check_armature",
 ]
