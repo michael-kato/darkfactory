@@ -1,0 +1,104 @@
+#pragma kernel ComputeSDF
+
+struct SDFPrimitive
+{
+    float3 position;
+    float3 scale;
+    int type; // 0 = sphere
+    float blendRadius;
+    int blendMode; // 0 = union, 1 = subtraction, 2 = intersection
+};
+
+RWStructuredBuffer<SDFPrimitive> _Primitives;
+RWTexture2D<float4> _Output;
+
+float4x4 _CameraMatrix;
+float4x4 _InverseViewMatrix;
+float4x4 _InverseProjectionMatrix;
+float3 _CameraPosition;
+
+int _PrimitiveCount;
+float _MaxDistance;
+int _MaxSteps;
+float _SurfaceThreshold;
+
+float sdSphere(float3 p, float3 center, float radius)
+{
+    return length(p - center) - radius;
+}
+
+float smin(float a, float b, float k)
+{
+    float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+    return lerp(b, a, h) - k * h * (1.0 - h);
+}
+
+float smax(float a, float b, float k)
+{
+    return -smin(-a, -b, k);
+}
+
+float SceneSDF(float3 p)
+{
+    if (_PrimitiveCount == 0)
+        return _MaxDistance;
+
+    float d = sdSphere(p, _Primitives[0].position, _Primitives[0].scale.x);
+    return d;
+}
+
+float3 GetNormal(float3 p)
+{
+    float2 e = float2(0.001, 0.0);
+    return normalize(float3(
+        SceneSDF(p + e.xyy) - SceneSDF(p - e.xyy),
+        SceneSDF(p + e.yxy) - SceneSDF(p - e.yxy),
+        SceneSDF(p + e.yyx) - SceneSDF(p - e.yyx)
+    ));
+}
+
+[numthreads(8, 8, 1)]
+void ComputeSDF(uint3 id : SV_DispatchThreadID)
+{
+    uint width, height;
+    _Output.GetDimensions(width, height);
+
+    if (id.x >= width || id.y >= height)
+        return;
+
+    float2 uv = float2(id.x, id.y) / float2(width, height);
+    uv = uv * 2.0 - 1.0;
+
+    float4 clipPos = float4(uv, 1.0, 1.0);
+    float4 viewPos = mul(_InverseProjectionMatrix, clipPos);
+    viewPos /= viewPos.w;
+    
+    float3 rayDir = normalize(mul(_InverseViewMatrix, float4(viewPos.xyz, 0.0)).xyz);
+    float3 rayOrigin = _CameraPosition;
+
+    float t = 0.0;
+    float3 col = float3(0.1, 0.1, 0.15);
+
+    for (int i = 0; i < _MaxSteps; i++)
+    {
+        float3 p = rayOrigin + rayDir * t;
+        float d = SceneSDF(p);
+
+        if (d < _SurfaceThreshold)
+        {
+            float3 n = GetNormal(p);
+            float3 lightDir = normalize(float3(1.0, 1.0, 0.5));
+            float diff = max(dot(n, lightDir), 0.0);
+            float3 ambient = float3(0.2, 0.2, 0.25);
+            col = ambient + diff * float3(0.8, 0.7, 0.6);
+            break;
+        }
+
+        if (t > _MaxDistance)
+            break;
+
+        t += d;
+    }
+
+    _Output[id.xy] = float4(col, 1.0);
+}

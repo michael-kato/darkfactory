@@ -11,6 +11,8 @@ cd "$PROJECT_DIR"
 UNITY_PATH=""
 if [[ -n "${UNITY_INSTALL:-}" ]]; then
   UNITY_PATH="$UNITY_INSTALL"
+elif [[ -d "/home/rawmeat/Unity/Hub/Editor/6000.3.8f1/Editor" ]]; then
+  UNITY_PATH="/home/rawmeat/Unity/Hub/Editor/6000.3.8f1/Editor/Unity"
 elif command -v Unity &>/dev/null; then
   UNITY_PATH="Unity"
 elif [[ -d "/Applications/Unity/Hub/Editor" ]]; then
@@ -29,13 +31,22 @@ echo "[sdfs] Running Unity batch mode build..."
   -quit \
   -batchmode \
   -nographics \
+  -noUpm \
+  -skipLicenseVerification \
   -logFile /tmp/unity_build.log
 
 if grep -qi "error:" /tmp/unity_build.log 2>/dev/null; then
-  echo "[sdfs] Build failed:"
-  grep -i "error:" /tmp/unity_build.log | head -10
-  exit 1
+  if ! grep -qi "Exiting batchmode successfully" /tmp/unity_build.log 2>/dev/null; then
+    echo "[sdfs] Build failed:"
+    grep -i "error:" /tmp/unity_build.log | head -10
+    exit 1
+  fi
 fi
 
-echo "[sdfs] Build successful"
-exit 0
+if grep -qi "Exiting batchmode successfully" /tmp/unity_build.log 2>/dev/null; then
+  echo "[sdfs] Build successful"
+  exit 0
+fi
+
+echo "[sdfs] Build result unclear"
+exit 1
