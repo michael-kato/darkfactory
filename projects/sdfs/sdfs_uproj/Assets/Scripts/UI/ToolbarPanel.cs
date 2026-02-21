@@ -30,18 +30,18 @@ public class ToolbarPanel : MonoBehaviour
         _clearAllButton = root.Q<Button>("ClearAllButton");
         _blendModeDropdown = root.Q<DropdownField>("BlendModeDropdown");
 
-        _sphereButton?.RegisterCallback<ClickEvent>(e => AddPrimitive(PrimitiveType.Sphere));
-        _boxButton?.RegisterCallback<ClickEvent>(e => AddPrimitive(PrimitiveType.Box));
-        _cylinderButton?.RegisterCallback<ClickEvent>(e => AddPrimitive(PrimitiveType.Cylinder));
-        _coneButton?.RegisterCallback<ClickEvent>(e => AddPrimitive(PrimitiveType.Cone));
-        _torusButton?.RegisterCallback<ClickEvent>(e => AddPrimitive(PrimitiveType.Torus));
-        _capsuleButton?.RegisterCallback<ClickEvent>(e => AddPrimitive(PrimitiveType.Capsule));
+        _sphereButton?.RegisterCallback<ClickEvent>(e => AddPrimitive(SDFPrimitiveType.Sphere));
+        _boxButton?.RegisterCallback<ClickEvent>(e => AddPrimitive(SDFPrimitiveType.Box));
+        _cylinderButton?.RegisterCallback<ClickEvent>(e => AddPrimitive(SDFPrimitiveType.Cylinder));
+        _coneButton?.RegisterCallback<ClickEvent>(e => AddPrimitive(SDFPrimitiveType.Cone));
+        _torusButton?.RegisterCallback<ClickEvent>(e => AddPrimitive(SDFPrimitiveType.Torus));
+        _capsuleButton?.RegisterCallback<ClickEvent>(e => AddPrimitive(SDFPrimitiveType.Capsule));
         _deleteButton?.RegisterCallback<ClickEvent>(e => DeleteSelected());
         _clearAllButton?.RegisterCallback<ClickEvent>(e => ClearAll());
         _blendModeDropdown?.RegisterCallback<ChangeEvent<string>>(OnBlendModeChanged);
     }
 
-    private void AddPrimitive(PrimitiveType type)
+    private void AddPrimitive(SDFPrimitiveType type)
     {
         if (sceneManager != null)
         {

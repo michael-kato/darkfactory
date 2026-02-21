@@ -29,11 +29,16 @@ Shader "SDF/Render"
             {
                 float2 uv : TEXCOORD0;
                 float4 vertex : SV_POSITION;
-                float3 worldPos : TEXCOORD1;
+                float3 rayDir : TEXCOORD1;
             };
 
-            float4x4 _CameraMatrix;
+            float4x4 _InverseViewProjection;
+            float4x4 _ViewProjectionMatrix;
             float3 _CameraPosition;
+            float3 _CameraForward;
+            float3 _CameraRight;
+            float3 _CameraUp;
+            float4 _CameraParams;
             float _MaxDistance;
             int _MaxSteps;
             float _SurfaceThreshold;
@@ -50,20 +55,20 @@ Shader "SDF/Render"
             StructuredBuffer<SDFPrimitiveData> _Primitives;
             int _PrimitiveCount;
 
-            float sdSphere(float3 p, float3 center, float3 scale)
+            float sdSphere(float3 p, float3 center, float3 radius)
             {
-                return length((p - center) / scale) * min(min(scale.x, scale.y), scale.z) - 1.0;
+                return length(p - center) - radius.x;
             }
 
-            float sdBox(float3 p, float3 center, float3 scale)
+            float sdBox(float3 p, float3 center, float3 halfExtents)
             {
-                float3 q = abs(p - center) - scale;
+                float3 q = abs(p - center) - halfExtents;
                 return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
             }
 
             float sdCylinder(float3 p, float3 center, float3 scale)
             {
-                float2 d = abs(float2(length(p.xz - center.xz), p.y - center.y)) - float2(scale.x, scale.z);
+                float2 d = abs(float2(length(p.xz - center.xz), p.y - center.y)) - float2(scale.x, scale.y);
                 return min(max(d.x, d.y), 0.0) + length(max(d, 0.0));
             }
 
@@ -183,7 +188,13 @@ Shader "SDF/Render"
             {
                 v2f o;
                 o.vertex = TransformObjectToHClip(v.vertex.xyz);
-                o.worldPos = TransformObjectToWorld(v.vertex.xyz);
+                
+                float2 ndc = v.vertex.xy;
+                float4 clipPos = float4(ndc, 1.0, 1.0);
+                float4 worldPos = mul(_InverseViewProjection, clipPos);
+                worldPos /= worldPos.w;
+                
+                o.rayDir = normalize(worldPos.xyz - _CameraPosition);
                 o.uv = v.uv;
                 return o;
             }
@@ -191,7 +202,7 @@ Shader "SDF/Render"
             float4 frag (v2f i) : SV_Target
             {
                 float3 rayOrigin = _CameraPosition;
-                float3 rayDir = normalize(i.worldPos - rayOrigin);
+                float3 rayDir = normalize(i.rayDir);
 
                 float t = 0.0;
                 float3 col = float3(0.1, 0.1, 0.15);
@@ -214,7 +225,7 @@ Shader "SDF/Render"
                     if (t > _MaxDistance)
                         break;
 
-                    t += d;
+                    t += max(d, 0.01);
                 }
 
                 return float4(col, 1.0);

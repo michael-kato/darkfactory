@@ -71,7 +71,7 @@ public class SDFSceneManager : MonoBehaviour
         }
     }
 
-    public void AddPrimitive(PrimitiveType type, Vector3 position, Vector3 scale)
+    public void AddPrimitive(SDFPrimitiveType type, Vector3 position, Vector3 scale)
     {
         GameObject primObj = new GameObject($"Primitive_{type}");
         primObj.transform.position = position;

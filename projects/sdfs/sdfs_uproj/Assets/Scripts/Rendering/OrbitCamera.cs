@@ -35,6 +35,10 @@ public class OrbitCamera : MonoBehaviour
 
     private void Update()
     {
+#if UNITY_EDITOR
+        if (!UnityEditor.EditorApplication.isPlaying) return;
+#endif
+        
         if (Input.GetMouseButton(1))
         {
             _yaw += Input.GetAxis("Mouse X") * sensitivity;
@@ -93,9 +97,9 @@ public class OrbitCamera : MonoBehaviour
 
         switch (prim.Type)
         {
-            case PrimitiveType.Sphere:
+            case SDFPrimitiveType.Sphere:
                 return GetSphereDistance(primPos, primScale, ray);
-            case PrimitiveType.Box:
+            case SDFPrimitiveType.Box:
                 return GetBoxDistance(primPos, prim.Scale * 0.5f, ray);
             default:
                 Vector3 toPrimitive = primPos - ray.origin;

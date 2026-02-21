@@ -691,14 +691,13 @@ MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1234567890}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0f97b4aa24cfc04d1ad23b2eb52490bf, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  sdfMaterial: {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
+  sdfMaterial: {fileID: 0}
   sceneManager: {fileID: 1234567894}
   maxDistance: 100
   maxSteps: 64
