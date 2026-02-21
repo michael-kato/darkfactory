@@ -6,6 +6,40 @@ Add realistic materials (refraction, emission) and post-processing (bloom) for t
 ## Depends On
 - `04-faux-physics.md`
 
+## Implementation Notes
+
+### URP vs Custom Raymarching
+- **Critical Issue**: Standard URP Lit shaders won't work with raymarching. You must extend the SDF shader directly.
+- The SDF shader already has basic lighting. Add material properties to `SDFPrimitiveData` and extend the fragment shader.
+
+### Material Data Structure
+- Add to `SDFPrimitiveData` in both C# and HLSL:
+  ```hlsl
+  struct SDFPrimitiveData {
+      // ... existing fields ...
+      float4 baseColor;    // RGB + alpha for transparency
+      float metallic;
+      float roughness;
+      float ior;           // Index of refraction
+      float3 emission;
+  };
+  ```
+
+### Refraction is Expensive
+- Double raymarching (entry + exit) for refraction is ~2x the cost.
+- **Optimization**: Only do exit-point march for materials with IOR != 1.0. Skip for opaque materials.
+- Consider pre-computing "thickness" for common shapes as an approximation.
+
+### Post-Processing Integration
+- URP Bloom works on the final rendered image, so it will work with the SDF output automatically.
+- Add a Global Volume to the scene with:
+  - Bloom: threshold 1.0, intensity 0.5
+  - Tonemapping: ACES
+
+### Transparency Order
+- Raymarching doesn't handle depth sorting. Objects render back-to-front naturally, but blend modes are tricky.
+- **Solution**: Use alpha blending for now. True transparency requires depth buffer compositing which is complex.
+
 ## Acceptance Criteria
 
 1. Material system with properties:

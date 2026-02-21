@@ -83,8 +83,8 @@ Workflow:
 1. Explore $PROJECT_ROOT to understand existing code and patterns
 2. Implement the spec — create all files under $PROJECT_ROOT
 3. Tests auto-run via hooks after each edit; iterate until green
-4. Commit: subject '[automated] ${PROJECT_NAME}: <description>'
-           branch  'automation/${PROJECT_NAME}/${SPEC_SLUG}'
+4. Commit directly to the current branch (do not create a new branch).
+   Commit subject: '[automated] ${PROJECT_NAME}: <description>'
 
 Work autonomously. Do not ask for clarification.
 If the spec is ambiguous, take the simpler interpretation and note it in the commit."

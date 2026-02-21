@@ -27,7 +27,7 @@ darkfactory/
 
 ## Automated Commit Format
 - Subject: `[automated] <project>: <description>`
-- Branch: `automation/<project>/<spec-slug>`
+- Branch: commit directly to the current branch — do not create a new branch
 - Tests must be green before committing (enforced by Stop hook)
 
 ## Factory Hook Behavior
