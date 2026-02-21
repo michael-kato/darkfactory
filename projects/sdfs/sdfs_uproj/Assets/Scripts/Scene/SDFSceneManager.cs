@@ -12,6 +12,11 @@ public struct SDFPrimitiveData
     public Vector3 velocity;
     public Vector3 displacement;
     public float timeOffset;
+    public Vector4 baseColor;
+    public float metallic;
+    public float roughness;
+    public float ior;
+    public Vector3 emission;
 }
 
 public class SDFSceneManager : MonoBehaviour
@@ -113,6 +118,9 @@ public class SDFSceneManager : MonoBehaviour
         for (int i = 0; i < _primitives.Count && i < maxPrimitives; i++)
         {
             SDFPrimitive prim = _primitives[i];
+            Color baseColor = prim.BaseColor;
+            Color emission = prim.Emission;
+            
             _primitiveData[i] = new SDFPrimitiveData
             {
                 position = prim.Position,
@@ -122,7 +130,12 @@ public class SDFSceneManager : MonoBehaviour
                 blendMode = (int)prim.BlendMode,
                 velocity = prim.Velocity,
                 displacement = prim.Displacement,
-                timeOffset = prim.TimeOffset
+                timeOffset = prim.TimeOffset,
+                baseColor = new Vector4(baseColor.r, baseColor.g, baseColor.b, baseColor.a),
+                metallic = prim.Metallic,
+                roughness = prim.Roughness,
+                ior = prim.Ior,
+                emission = new Vector3(emission.r, emission.g, emission.b)
             };
         }
 

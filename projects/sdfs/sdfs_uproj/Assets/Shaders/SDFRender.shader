@@ -50,6 +50,14 @@ Shader "SDF/Render"
                 int type;
                 float blendRadius;
                 int blendMode;
+                float3 velocity;
+                float3 displacement;
+                float timeOffset;
+                float4 baseColor;
+                float metallic;
+                float roughness;
+                float ior;
+                float3 emission;
             };
 
             StructuredBuffer<SDFPrimitiveData> _Primitives;
@@ -57,7 +65,7 @@ Shader "SDF/Render"
 
             float sdSphere(float3 p, float3 center, float3 radius)
             {
-                return length(p - center) - radius.x;
+                return length(p - center) - scale.x;
             }
 
             float sdBox(float3 p, float3 center, float3 halfExtents)
@@ -204,9 +212,12 @@ Shader "SDF/Render"
             {
                 float3 rayOrigin = _CameraPosition;
                 float3 rayDir = normalize(i.rayDir);
+                float3 rayDir = normalize(i.rayDir);
 
                 float t = 0.0;
                 float3 col = float3(0.1, 0.1, 0.15);
+                float4 hitColor = float4(0,0,0,0);
+                int hitIndex = -1;
 
                 for (int j = 0; j < _MaxSteps; j++)
                 {
@@ -215,11 +226,16 @@ Shader "SDF/Render"
 
                     if (d < _SurfaceThreshold)
                     {
-                        float3 n = GetNormal(p);
-                        float3 lightDir = normalize(float3(1.0, 1.0, 0.5));
-                        float diff = max(dot(n, lightDir), 0.0);
-                        float3 ambient = float3(0.2, 0.2, 0.25);
-                        col = ambient + diff * float3(0.8, 0.7, 0.6);
+                        hitIndex = 0;
+                        for (int k = 1; k < _PrimitiveCount; k++)
+                        {
+                            float d2 = GetPrimitiveDistance(p, _Primitives[k]);
+                            if (d2 < _SurfaceThreshold)
+                            {
+                                hitIndex = k;
+                                d = d2;
+                            }
+                        }
                         break;
                     }
 
@@ -227,6 +243,40 @@ Shader "SDF/Render"
                         break;
 
                     t += max(d, 0.01);
+                }
+
+                if (hitIndex >= 0)
+                {
+                    float3 p = rayOrigin + rayDir * t;
+                    float3 n = GetNormal(p);
+                    SDFPrimitiveData prim = _Primitives[hitIndex];
+                    
+                    float3 lightDir = normalize(float3(1.0, 1.0, 0.5));
+                    float3 viewDir = -rayDir;
+                    float3 halfDir = normalize(lightDir + viewDir);
+                    
+                    float NdotL = max(dot(n, lightDir), 0.0);
+                    float NdotH = max(dot(n, halfDir), 0.0);
+                    
+                    float3 baseCol = prim.baseColor.rgb;
+                    float metallic = prim.metallic;
+                    float roughness = prim.roughness;
+                    
+                    float3 ambient = baseCol * 0.15;
+                    float3 diffuse = baseCol * NdotL * (1.0 - metallic);
+                    float spec = pow(NdotH, (1.0 - roughness) * 128.0) * (1.0 - roughness);
+                    float3 specular = float3(1.0, 0.95, 0.9) * spec * (metallic + 0.5);
+                    
+                    col = ambient + diffuse + specular + prim.emission;
+                }
+
+                return float4(col, 1.0);
+            }
+
+                    if (t > _MaxDistance)
+                        break;
+
+                    t += d;
                 }
 
                 return float4(col, 1.0);

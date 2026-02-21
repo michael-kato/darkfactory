@@ -28,10 +28,52 @@ public class SDFPrimitive : MonoBehaviour
     [SerializeField] private float blendRadius = 0.5f;
     [SerializeField] private BlendMode blendMode = BlendMode.Union;
     [SerializeField] private bool isSelected = false;
+    
+    [SerializeField] private Vector3 basePosition = Vector3.zero;
+    [SerializeField] private Vector3 velocity = Vector3.zero;
+    [SerializeField] private Vector3 displacement = Vector3.zero;
+    [SerializeField] private float timeOffset = 0f;
+    
+    [Header("Material")]
+    [SerializeField] private Color baseColor = new Color(0.3f, 0.6f, 1f, 1f);
+    [SerializeField] private float metallic = 0f;
+    [SerializeField] private float roughness = 0.5f;
+    [SerializeField] private float ior = 1.33f;
+    [SerializeField] private Color emission = Color.black;
 
     private MeshFilter _meshFilter;
     private MeshRenderer _meshRenderer;
     private Material _primitiveMaterial;
+
+    public Color BaseColor
+    {
+        get => baseColor;
+        set => baseColor = value;
+    }
+    
+    public float Metallic
+    {
+        get => metallic;
+        set => metallic = value;
+    }
+    
+    public float Roughness
+    {
+        get => roughness;
+        set => roughness = value;
+    }
+    
+    public float Ior
+    {
+        get => ior;
+        set => ior = value;
+    }
+    
+    public Color Emission
+    {
+        get => emission;
+        set => emission = value;
+    }
 
     private void Awake()
     {
