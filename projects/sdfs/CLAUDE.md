@@ -1,7 +1,7 @@
 # SDF Editor - Project Conventions
 
 ## Stack
-- Unity 6.x (2024.2+)
+- Unity 6.x (/home/rawmeat/Unity/Hub/Editor/6000.3.8f1/Editor/)
 - Universal Render Pipeline (URP) 17.x
 - C#
 - Compute Shaders (HLSL)

@@ -3,7 +3,7 @@ using UnityEngine;
 public class SDFRenderer : MonoBehaviour
 {
     [SerializeField] private Material sdfMaterial;
-    [SerializeField] private Transform primitiveTransform;
+    [SerializeField] private SDFSceneManager sceneManager;
     
     [SerializeField] private float maxDistance = 100f;
     [SerializeField] private int maxSteps = 64;
@@ -100,17 +100,11 @@ public class SDFRenderer : MonoBehaviour
         sdfMaterial.SetMatrix("_CameraMatrix", cameraMatrix);
         sdfMaterial.SetVector("_CameraPosition", _camera.transform.position);
 
-        Vector3 primitivePos = Vector3.zero;
-        Vector3 primitiveScale = Vector3.one;
-
-        if (primitiveTransform != null)
+        if (sceneManager != null && sceneManager.PrimitiveBuffer != null)
         {
-            primitivePos = primitiveTransform.position;
-            primitiveScale = primitiveTransform.localScale;
+            sdfMaterial.SetBuffer("_Primitives", sceneManager.PrimitiveBuffer);
+            sdfMaterial.SetInt("_PrimitiveCount", sceneManager.PrimitiveCount);
         }
-
-        sdfMaterial.SetVector("_PrimitivePos", primitivePos);
-        sdfMaterial.SetVector("_PrimitiveScale", primitiveScale);
     }
 
     private void OnRenderImage(RenderTexture source, RenderTexture destination)
