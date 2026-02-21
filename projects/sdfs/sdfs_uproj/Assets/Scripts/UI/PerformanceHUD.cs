@@ -45,7 +45,7 @@ public class PerformanceHUD : MonoBehaviour
 
         if (_drawCallsText != null)
         {
-            string pipelineName = UnityEngine.Rendering.GraphicsSettings.renderPipelineAsset != null ? 
+            string pipelineName = UnityEngine.Rendering.GraphicsSettings.defaultRenderPipeline != null ? 
                 "URP" : "Built-in";
             _drawCallsText.text = $"Draw Calls: {pipelineName}";
         }

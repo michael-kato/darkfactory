@@ -1,0 +1,7 @@
+<UXML xmlns="UnityEngine.UIElements">
+    <VisualElement name="PerformanceHUD" style="position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background-color: rgba(30, 30, 30, 0.7); padding: 8px 15px; border-radius: 5px;">
+        <Label name="FPSText" text="FPS: 60" style="color: #00ff00; font-size: 12px;"/>
+        <Label name="PrimitiveCountText" text="Primitives: 0" style="color: white; font-size: 12px;"/>
+        <Label name="DrawCallsText" text="Draw Calls: URP" style="color: #aaaaaa; font-size: 12px;"/>
+    </VisualElement>
+</UXML>

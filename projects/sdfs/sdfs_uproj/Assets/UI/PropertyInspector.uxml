@@ -1,0 +1,39 @@
+<UXML xmlns="UnityEngine.UIElements">
+    <VisualElement name="PropertyInspectorPanel" style="position: absolute; top: 10px; right: 10px; background-color: rgba(30, 30, 30, 0.9); padding: 10px; border-radius: 8px; width: 220px;">
+        <Label text="Properties" style="color: white; font-size: 14px; margin-bottom: 10px;"/>
+        
+        <VisualElement name="ContentPanel">
+            <Label text="Position" style="color: #aaaaaa; font-size: 12px; margin-bottom: 3px;"/>
+            
+            <VisualElement style="flex-direction: row; margin-bottom: 5px;">
+                <Label text="X:" style="color: white; width: 20px;"/>
+                <Slider name="PositionXSlider" style="flex: 1;"/>
+                <Label name="PositionXValue" text="0.00" style="color: white; width: 40px; text-align: right;"/>
+            </VisualElement>
+            
+            <VisualElement style="flex-direction: row; margin-bottom: 5px;">
+                <Label text="Y:" style="color: white; width: 20px;"/>
+                <Slider name="PositionYSlider" style="flex: 1;"/>
+                <Label name="PositionYValue" text="0.00" style="color: white; width: 40px; text-align: right;"/>
+            </VisualElement>
+            
+            <VisualElement style="flex-direction: row; margin-bottom: 10px;">
+                <Label text="Z:" style="color: white; width: 20px;"/>
+                <Slider name="PositionZSlider" style="flex: 1;"/>
+                <Label name="PositionZValue" text="0.00" style="color: white; width: 40px; text-align: right;"/>
+            </VisualElement>
+            
+            <Label text="Scale" style="color: #aaaaaa; font-size: 12px; margin-bottom: 3px;"/>
+            <VisualElement style="flex-direction: row; margin-bottom: 10px;">
+                <Slider name="ScaleSlider" style="flex: 1;"/>
+                <Label name="ScaleValue" text="1.00" style="color: white; width: 40px; text-align: right;"/>
+            </VisualElement>
+            
+            <Label text="Blend Radius" style="color: #aaaaaa; font-size: 12px; margin-bottom: 3px;"/>
+            <VisualElement style="flex-direction: row;">
+                <Slider name="BlendRadiusSlider" style="flex: 1;"/>
+                <Label name="BlendRadiusValue" text="0.50" style="color: white; width: 40px; text-align: right;"/>
+            </VisualElement>
+        </VisualElement>
+    </VisualElement>
+</UXML>

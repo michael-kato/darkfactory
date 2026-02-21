@@ -1,0 +1,21 @@
+<UXML xmlns="UnityEngine.UIElements">
+    <VisualElement name="ToolbarPanel" style="position: absolute; top: 10px; left: 10px; background-color: rgba(30, 30, 30, 0.9); padding: 10px; border-radius: 8px;">
+        <Label text="Add Primitive" style="color: white; font-size: 14px; margin-bottom: 5px;"/>
+        <Button name="SphereButton" text="Sphere" style="margin-bottom: 3px; width: 100%;"/>
+        <Button name="BoxButton" text="Box" style="margin-bottom: 3px; width: 100%;"/>
+        <Button name="CylinderButton" text="Cylinder" style="margin-bottom: 3px; width: 100%;"/>
+        <Button name="ConeButton" text="Cone" style="margin-bottom: 3px; width: 100%;"/>
+        <Button name="TorusButton" text="Torus" style="margin-bottom: 3px; width: 100%;"/>
+        <Button name="CapsuleButton" text="Capsule" style="margin-bottom: 10px; width: 100%;"/>
+        
+        <Label text="Blend Mode" style="color: white; font-size: 14px; margin-bottom: 5px;"/>
+        <DropdownField name="BlendModeDropdown" style="margin-bottom: 10px; width: 100%;">
+            <Option text="Union"/>
+            <Option text="Subtraction"/>
+            <Option text="Intersection"/>
+        </DropdownField>
+        
+        <Button name="DeleteButton" text="Delete Selected" style="margin-bottom: 3px; width: 100%; background-color: #cc3333; color: white;"/>
+        <Button name="ClearAllButton" text="Clear All" style="width: 100%; background-color: #666666; color: white;"/>
+    </VisualElement>
+</UXML>
