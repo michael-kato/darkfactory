@@ -8,7 +8,7 @@ geometry, and interior faces. Append results to the QA report.
 ## Depends On
 - `stage0-qa-schema.md`
 - `stage0-intake-triage.md` (report object passed in)
-- Blender 3.x or 4.x installed and on PATH as `blender`
+- Blender 5.x installed and on PATH as `blender`
 
 ## Acceptance Criteria
 
@@ -63,7 +63,7 @@ geometry, and interior faces. Append results to the QA report.
 
 **Integration test** (`blender_tests/test_stage1a_blender.py`) — run via
 `blender --background --python blender_tests/test_stage1a_blender.py`:
-- Import `asscheck_uproj/Assets/Models/street_lamp_01_quant.gltf`
+- Import `assets/street_lamp_01.gltf` (via `ASSETS_DIR = Path(__file__).parent.parent / "assets"`); skip if `ASSETS_DIR` does not exist
 - Run full geometry check; assert no crash and result is valid JSON
 
 ## Out of Scope

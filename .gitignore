@@ -149,6 +149,9 @@ venv.bak/
 .claude/runs/
 .claude/test-status
 
+# Project test assets (large binaries, managed outside git)
+projects/**/assets/
+
 # Unity generated directories (per-project, any nesting depth)
 projects/**/Library/
 projects/**/Temp/
