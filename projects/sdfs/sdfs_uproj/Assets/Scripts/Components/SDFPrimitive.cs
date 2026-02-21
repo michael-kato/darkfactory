@@ -88,6 +88,30 @@ public class SDFPrimitive : MonoBehaviour
         set => position = value;
     }
 
+    public Vector3 BasePosition
+    {
+        get => basePosition;
+        set => basePosition = value;
+    }
+    
+    public Vector3 Velocity
+    {
+        get => velocity;
+        set => velocity = value;
+    }
+    
+    public Vector3 Displacement
+    {
+        get => displacement;
+        set => displacement = value;
+    }
+    
+    public float TimeOffset
+    {
+        get => timeOffset;
+        set => timeOffset = value;
+    }
+
     public Vector3 Scale
     {
         get => scale;
@@ -114,7 +138,7 @@ public class SDFPrimitive : MonoBehaviour
 
     private void Update()
     {
-        transform.position = position;
+        transform.position = position + displacement;
         transform.localScale = scale;
         transform.rotation = rotation;
     }
@@ -122,6 +146,7 @@ public class SDFPrimitive : MonoBehaviour
     public void SyncFromTransform()
     {
         position = transform.position;
+        basePosition = position;
         scale = transform.localScale;
         rotation = transform.rotation;
     }

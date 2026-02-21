@@ -107,15 +107,16 @@ Shader "SDF/Render"
 
             float GetPrimitiveDistance(float3 p, SDFPrimitiveData prim)
             {
+                float3 displacedP = p - prim.displacement;
                 switch (prim.type)
                 {
-                    case 0: return sdSphere(p, prim.position, prim.scale);
-                    case 1: return sdBox(p, prim.position, prim.scale);
-                    case 2: return sdCylinder(p, prim.position, prim.scale);
-                    case 3: return sdCone(p, prim.position, prim.scale);
-                    case 4: return sdTorus(p, prim.position, prim.scale);
-                    case 5: return sdCapsule(p, prim.position, prim.scale);
-                    default: return sdSphere(p, prim.position, prim.scale);
+                    case 0: return sdSphere(displacedP, prim.position, prim.scale);
+                    case 1: return sdBox(displacedP, prim.position, prim.scale);
+                    case 2: return sdCylinder(displacedP, prim.position, prim.scale);
+                    case 3: return sdCone(displacedP, prim.position, prim.scale);
+                    case 4: return sdTorus(displacedP, prim.position, prim.scale);
+                    case 5: return sdCapsule(displacedP, prim.position, prim.scale);
+                    default: return sdSphere(displacedP, prim.position, prim.scale);
                 }
             }
 
