@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public enum PrimitiveType
+public enum SDFPrimitiveType
 {
     Sphere = 0,
     Box = 1,
@@ -17,9 +17,11 @@ public enum BlendMode
     Intersection = 2
 }
 
+[RequireComponent(typeof(MeshFilter))]
+[RequireComponent(typeof(MeshRenderer))]
 public class SDFPrimitive : MonoBehaviour
 {
-    [SerializeField] private PrimitiveType type = PrimitiveType.Sphere;
+    [SerializeField] private SDFPrimitiveType type = SDFPrimitiveType.Sphere;
     [SerializeField] private Vector3 position = Vector3.zero;
     [SerializeField] private Vector3 scale = Vector3.one;
     [SerializeField] private Quaternion rotation = Quaternion.identity;
@@ -27,16 +29,57 @@ public class SDFPrimitive : MonoBehaviour
     [SerializeField] private BlendMode blendMode = BlendMode.Union;
     [SerializeField] private bool isSelected = false;
 
+    private MeshFilter _meshFilter;
+    private MeshRenderer _meshRenderer;
+    private Material _primitiveMaterial;
+
+    private void Awake()
+    {
+        _meshFilter = GetComponent<MeshFilter>();
+        _meshRenderer = GetComponent<MeshRenderer>();
+        
+        _primitiveMaterial = new Material(Shader.Find("Standard"));
+        _primitiveMaterial.color = new Color(0.3f, 0.6f, 1f, 0.5f);
+        _primitiveMaterial.SetFloat("_Mode", 3);
+        _primitiveMaterial.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        _primitiveMaterial.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        _primitiveMaterial.SetInt("_ZWrite", 0);
+        _primitiveMaterial.DisableKeyword("_ALPHATEST_ON");
+        _primitiveMaterial.EnableKeyword("_ALPHABLEND_ON");
+        _primitiveMaterial.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+        _primitiveMaterial.renderQueue = 3000;
+        
+        _meshRenderer.material = _primitiveMaterial;
+        
+        UpdateMesh();
+    }
+
     public bool IsSelected
     {
         get => isSelected;
-        set => isSelected = value;
+        set 
+        { 
+            isSelected = value; 
+            UpdateSelectionState();
+        }
     }
 
-    public PrimitiveType Type
+    private void UpdateSelectionState()
+    {
+        if (_primitiveMaterial != null)
+        {
+            _primitiveMaterial.color = isSelected ? new Color(1f, 0.6f, 0.3f, 0.6f) : new Color(0.3f, 0.6f, 1f, 0.5f);
+        }
+    }
+
+    public SDFPrimitiveType Type
     {
         get => type;
-        set => type = value;
+        set 
+        { 
+            type = value; 
+            UpdateMesh();
+        }
     }
 
     public Vector3 Position
@@ -81,5 +124,82 @@ public class SDFPrimitive : MonoBehaviour
         position = transform.position;
         scale = transform.localScale;
         rotation = transform.rotation;
+    }
+
+    private void UpdateMesh()
+    {
+        if (_meshFilter == null) return;
+
+        switch (type)
+        {
+            case SDFPrimitiveType.Sphere:
+                _meshFilter.sharedMesh = GetPrimitiveMesh(SDFPrimitiveType.Sphere);
+                break;
+            case SDFPrimitiveType.Box:
+                _meshFilter.sharedMesh = GetPrimitiveMesh(SDFPrimitiveType.Box);
+                break;
+            case SDFPrimitiveType.Cylinder:
+                _meshFilter.sharedMesh = GetPrimitiveMesh(SDFPrimitiveType.Cylinder);
+                break;
+            case SDFPrimitiveType.Cone:
+                _meshFilter.sharedMesh = GetPrimitiveMesh(SDFPrimitiveType.Cone);
+                break;
+            case SDFPrimitiveType.Torus:
+                _meshFilter.sharedMesh = CreateTorusMesh();
+                break;
+            case SDFPrimitiveType.Capsule:
+                _meshFilter.sharedMesh = GetPrimitiveMesh(SDFPrimitiveType.Capsule);
+                break;
+        }
+    }
+
+    private static Mesh GetPrimitiveMesh(SDFPrimitiveType type)
+    {
+        GameObject temp = null;
+        Mesh mesh = null;
+        
+        switch (type)
+        {
+            case SDFPrimitiveType.Sphere:
+                temp = GameObject.CreatePrimitive(UnityEngine.PrimitiveType.Sphere);
+                break;
+            case SDFPrimitiveType.Box:
+                temp = GameObject.CreatePrimitive(UnityEngine.PrimitiveType.Cube);
+                break;
+            case SDFPrimitiveType.Cylinder:
+                temp = GameObject.CreatePrimitive(UnityEngine.PrimitiveType.Cylinder);
+                break;
+            case SDFPrimitiveType.Cone:
+                mesh = CreateConeMesh();
+                return mesh;
+            case SDFPrimitiveType.Capsule:
+                temp = GameObject.CreatePrimitive(UnityEngine.PrimitiveType.Capsule);
+                break;
+        }
+        
+        if (temp != null)
+        {
+            mesh = temp.GetComponent<MeshFilter>().sharedMesh;
+            Destroy(temp);
+        }
+        
+        return mesh;
+    }
+
+    private static Mesh CreateConeMesh()
+    {
+        GameObject temp = GameObject.CreatePrimitive(UnityEngine.PrimitiveType.Cylinder);
+        temp.transform.localScale = new Vector3(1, 0.001f, 1);
+        Mesh mesh = temp.GetComponent<MeshFilter>().sharedMesh;
+        Destroy(temp);
+        return mesh;
+    }
+
+    private static Mesh CreateTorusMesh()
+    {
+        GameObject temp = GameObject.CreatePrimitive(UnityEngine.PrimitiveType.Quad);
+        Mesh mesh = temp.GetComponent<MeshFilter>().sharedMesh;
+        Destroy(temp);
+        return mesh;
     }
 }
