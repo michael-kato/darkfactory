@@ -1,1 +1,5 @@
 pytest>=7.0
+# Stage 5: SSIM perceptual diff (required for actual SSIM computation;
+# unit tests mock this and do not require these packages).
+scikit-image>=0.19
+Pillow>=9.0
