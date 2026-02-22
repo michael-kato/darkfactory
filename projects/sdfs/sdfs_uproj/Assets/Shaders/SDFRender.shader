@@ -268,15 +268,9 @@ Shader "SDF/Render"
                     float3 specular = float3(1.0, 0.95, 0.9) * spec * (metallic + 0.5);
                     
                     col = ambient + diffuse + specular + prim.emission;
-                }
-
-                return float4(col, 1.0);
-            }
-
-                    if (t > _MaxDistance)
-                        break;
-
-                    t += d;
+                    
+                    float speed = length(prim.velocity);
+                    col += prim.baseColor.rgb * speed * 2.0;
                 }
 
                 return float4(col, 1.0);

@@ -34,7 +34,6 @@ public class SDFSceneManager : MonoBehaviour
     private SDFPrimitiveData[] _primitiveData;
     private List<SDFPrimitive> _primitives = new List<SDFPrimitive>();
     private SDFPrimitive _selectedPrimitive;
-    private float _time;
 
     public ComputeBuffer PrimitiveBuffer => _primitiveBuffer;
     public int PrimitiveCount => _primitives.Count;
@@ -62,7 +61,6 @@ public class SDFSceneManager : MonoBehaviour
 
     private void Update()
     {
-        _time += Time.deltaTime;
         CollectPrimitives();
         UpdatePhysics();
         UpdateBuffer();
@@ -85,31 +83,37 @@ public class SDFSceneManager : MonoBehaviour
             SDFPrimitive prim = _primitives[i];
             if (prim == null) continue;
             
-            Vector3 targetPos = prim.BasePosition;
             Vector3 currentPos = prim.Position;
+            Vector3 basePos = prim.BasePosition;
             
-            Vector3 displacement = prim.Displacement;
-            Vector3 velocity = prim.Velocity;
-            
-            Vector3 springForce = (targetPos - currentPos - displacement) * stiffness;
-            Vector3 dampingForce = -velocity * damping;
-            
-            Vector3 acceleration = springForce + dampingForce;
-            velocity += acceleration * dt;
-            displacement += velocity * dt;
-            
-            float maxDisplacement = amplitude * 0.5f;
-            displacement = Vector3.ClampMagnitude(displacement, maxDisplacement);
-            
-            float wobble = Mathf.Sin(_time * waveFrequency + prim.TimeOffset) * amplitude;
-            Vector3 wobbleOffset = new Vector3(
-                Mathf.Sin(_time * waveFrequency * 1.3f + prim.TimeOffset),
-                Mathf.Sin(_time * waveFrequency * 0.9f + prim.TimeOffset + 1.0f),
-                Mathf.Sin(_time * waveFrequency * 1.1f + prim.TimeOffset + 2.0f)
-            ) * wobble * 0.1f;
-            
-            prim.Velocity = velocity;
-            prim.Displacement = displacement + wobbleOffset;
+            float moveSpeed = Vector3.Distance(currentPos, basePos);
+            if (moveSpeed > 0.01f)
+            {
+                Vector3 displacement = prim.Displacement;
+                Vector3 velocity = prim.Velocity;
+                
+                velocity += (currentPos - basePos) * stiffness * dt;
+                velocity *= (1f - damping * dt);
+                
+                displacement += velocity * dt;
+                
+                float maxDisplacement = amplitude;
+                displacement = Vector3.ClampMagnitude(displacement, maxDisplacement);
+                
+                prim.Velocity = velocity;
+                prim.Displacement = displacement;
+            }
+            else
+            {
+                prim.Velocity *= (1f - damping * dt * 2f);
+                prim.Displacement *= (1f - damping * dt);
+                
+                if (prim.Displacement.magnitude < 0.001f)
+                {
+                    prim.Displacement = Vector3.zero;
+                    prim.Velocity = Vector3.zero;
+                }
+            }
         }
     }
 

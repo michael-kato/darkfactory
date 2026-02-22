@@ -80,16 +80,23 @@ public class SDFPrimitive : MonoBehaviour
         _meshFilter = GetComponent<MeshFilter>();
         _meshRenderer = GetComponent<MeshRenderer>();
         
-        _primitiveMaterial = new Material(Shader.Find("Standard"));
-        _primitiveMaterial.color = new Color(0.3f, 0.6f, 1f, 0.5f);
-        _primitiveMaterial.SetFloat("_Mode", 3);
-        _primitiveMaterial.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-        _primitiveMaterial.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-        _primitiveMaterial.SetInt("_ZWrite", 0);
-        _primitiveMaterial.DisableKeyword("_ALPHATEST_ON");
-        _primitiveMaterial.EnableKeyword("_ALPHABLEND_ON");
-        _primitiveMaterial.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-        _primitiveMaterial.renderQueue = 3000;
+        Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+        if (shader == null)
+            shader = Shader.Find("Standard");
+        if (shader == null)
+            shader = Shader.Find("Unlit/Color");
+        
+        if (shader != null)
+        {
+            _primitiveMaterial = new Material(shader);
+            _primitiveMaterial.color = new Color(0.3f, 0.6f, 1f, 0.8f);
+        }
+        
+        if (_primitiveMaterial == null)
+        {
+            _primitiveMaterial = new Material(Shader.Find("Unlit/Color"));
+            _primitiveMaterial.color = Color.blue;
+        }
         
         _meshRenderer.material = _primitiveMaterial;
         
