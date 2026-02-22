@@ -48,83 +48,6 @@ public class SDFExporter : MonoBehaviour
         Destroy(mesh);
     }
 
-    public void SaveScene(string path)
-    {
-        if (sceneManager == null)
-        {
-            Debug.LogError("No scene manager");
-            return;
-        }
-
-        SDFSceneData data = new SDFSceneData();
-        data.physics = new PhysicsData
-        {
-            stiffness = sceneManager.Stiffness,
-            damping = sceneManager.Damping,
-            amplitude = sceneManager.Amplitude,
-            waveFrequency = sceneManager.WaveFrequency,
-            physicsEnabled = sceneManager.PhysicsEnabled
-        };
-
-        SDFPrimitive[] primitives = FindObjectsOfType<SDFPrimitive>();
-        data.primitives = new List<PrimitiveData>();
-
-        foreach (var prim in primitives)
-        {
-            data.primitives.Add(new PrimitiveData
-            {
-                type = prim.Type.ToString(),
-                position = prim.Position,
-                scale = prim.Scale,
-                blendRadius = prim.BlendRadius,
-                blendMode = prim.BlendMode.ToString(),
-                baseColor = new float[] { prim.BaseColor.r, prim.BaseColor.g, prim.BaseColor.b, prim.BaseColor.a },
-                metallic = prim.Metallic,
-                roughness = prim.Roughness,
-                ior = prim.Ior,
-                emission = new float[] { prim.Emission.r, prim.Emission.g, prim.Emission.b }
-            });
-        }
-
-        string json = JsonUtility.ToJson(data, true);
-        File.WriteAllText(path, json);
-        Debug.Log($"Scene saved to: {path}");
-    }
-
-    public void LoadScene(string path)
-    {
-        if (sceneManager == null)
-        {
-            Debug.LogError("No scene manager");
-            return;
-        }
-
-        string json = File.ReadAllText(path);
-        SDFSceneData data = JsonUtility.FromJson<SDFSceneData>(json);
-
-        sceneManager.ClearAllPrimitives();
-
-        if (data.physics != null)
-        {
-            sceneManager.Stiffness = data.physics.stiffness;
-            sceneManager.Damping = data.physics.damping;
-            sceneManager.Amplitude = data.physics.amplitude;
-            sceneManager.WaveFrequency = data.physics.waveFrequency;
-            sceneManager.PhysicsEnabled = data.physics.physicsEnabled;
-        }
-
-        if (data.primitives != null)
-        {
-            foreach (var p in data.primitives)
-            {
-                SDFPrimitiveType type = (SDFPrimitiveType)System.Enum.Parse(typeof(SDFPrimitiveType), p.type);
-                sceneManager.AddPrimitive(type, p.position, p.scale);
-            }
-        }
-
-        Debug.Log($"Scene loaded from: {path}");
-    }
-
     private Mesh GenerateMesh(int resolution)
     {
         float step = 4f / resolution;
@@ -203,17 +126,6 @@ public class SDFExporter : MonoBehaviour
                     d = Mathf.Max(d, primD);
                     break;
             }
-            
-            if (prim.BlendRadius > 0)
-            {
-                float k = prim.BlendRadius;
-                float smin = d + primD - k * Mathf.Sqrt(2 * k * k - (d - primD) * (d - primD));
-                if (k > 0)
-                {
-                    float h = Mathf.Clamp01(0.5f + 0.5f * (d - primD) / k);
-                    d = Mathf.Lerp(d, primD, h) - k * h * (1 - h);
-                }
-            }
         }
         
         return d;
@@ -232,44 +144,8 @@ public class SDFExporter : MonoBehaviour
                 Vector3 q = p - pos;
                 q = new Vector3(Mathf.Abs(q.x), Mathf.Abs(q.y), Mathf.Abs(q.z)) - scale;
                 return Vector3.Distance(Vector3.Max(q, Vector3.zero), Vector3.Min(q, Vector3.one)) - 0.01f;
-            case SDFPrimitiveType.Cylinder:
-                float x = Vector3.Distance(new Vector2(p.x, p.z), new Vector2(pos.x, pos.z)) - scale.x;
-                float y = Mathf.Abs(p.y - pos.y) - scale.y;
-                return Mathf.Min(Mathf.Max(x, y), 0) + Vector3.Distance(new Vector2(Mathf.Max(x, 0), Mathf.Max(y, 0)), Vector2.zero);
             default:
                 return Vector3.Distance(p, pos) - scale.x;
         }
     }
-}
-
-[System.Serializable]
-public class SDFSceneData
-{
-    public PhysicsData physics;
-    public List<PrimitiveData> primitives;
-}
-
-[System.Serializable]
-public class PhysicsData
-{
-    public float stiffness;
-    public float damping;
-    public float amplitude;
-    public float waveFrequency;
-    public bool physicsEnabled;
-}
-
-[System.Serializable]
-public class PrimitiveData
-{
-    public string type;
-    public Vector3 position;
-    public Vector3 scale;
-    public float blendRadius;
-    public string blendMode;
-    public float[] baseColor;
-    public float metallic;
-    public float roughness;
-    public float ior;
-    public float[] emission;
 }

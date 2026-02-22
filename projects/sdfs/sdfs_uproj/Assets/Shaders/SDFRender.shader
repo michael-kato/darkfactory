@@ -13,11 +13,12 @@ Shader "SDF/Render"
 
         Pass
         {
-            HLSLPROGRAM
+            CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
-            
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #pragma target 4.0
+
+            #include "UnityCG.cginc"
 
             struct appdata
             {
@@ -52,7 +53,6 @@ Shader "SDF/Render"
                 int blendMode;
                 float3 velocity;
                 float3 displacement;
-                float timeOffset;
                 float4 baseColor;
                 float metallic;
                 float roughness;
@@ -63,14 +63,14 @@ Shader "SDF/Render"
             StructuredBuffer<SDFPrimitiveData> _Primitives;
             int _PrimitiveCount;
 
-            float sdSphere(float3 p, float3 center, float3 radius)
+            float sdSphere(float3 p, float3 center, float3 scale)
             {
                 return length(p - center) - scale.x;
             }
 
-            float sdBox(float3 p, float3 center, float3 halfExtents)
+            float sdBox(float3 p, float3 center, float3 scale)
             {
-                float3 q = abs(p - center) - halfExtents;
+                float3 q = abs(p - center) - scale;
                 return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
             }
 
@@ -196,7 +196,7 @@ Shader "SDF/Render"
             v2f vert (appdata v)
             {
                 v2f o;
-                o.vertex = TransformObjectToHClip(v.vertex.xyz);
+                o.vertex = UnityObjectToClipPos(v.vertex);
                 
                 float2 ndc = v.vertex.xy;
                 float4 clipPos = float4(ndc, 1.0, 1.0);
@@ -212,11 +212,9 @@ Shader "SDF/Render"
             {
                 float3 rayOrigin = _CameraPosition;
                 float3 rayDir = normalize(i.rayDir);
-                float3 rayDir = normalize(i.rayDir);
 
                 float t = 0.0;
                 float3 col = float3(0.1, 0.1, 0.15);
-                float4 hitColor = float4(0,0,0,0);
                 int hitIndex = -1;
 
                 for (int j = 0; j < _MaxSteps; j++)
@@ -275,7 +273,7 @@ Shader "SDF/Render"
 
                 return float4(col, 1.0);
             }
-            ENDHLSL
+            ENDCG
         }
     }
 }
