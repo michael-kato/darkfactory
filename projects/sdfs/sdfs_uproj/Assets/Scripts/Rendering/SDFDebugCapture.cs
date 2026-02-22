@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class SDFDebugCapture : MonoBehaviour
 {
-    [SerializeField] private SDFRenderer renderer;
+    [SerializeField] private SDFRenderer sdfRenderer;
     [SerializeField] private SDFSceneManager sceneManager;
     [SerializeField] private Camera captureCamera;
     
@@ -17,7 +17,7 @@ public class SDFDebugCapture : MonoBehaviour
     private void CaptureDebugImage()
     {
         Debug.Log($"[SDF Debug] Capture starting...");
-        Debug.Log($"[SDF Debug] Renderer present: {renderer != null}");
+        Debug.Log($"[SDF Debug] Renderer present: {sdfRenderer != null}");
         Debug.Log($"[SDF Debug] Scene Manager: {sceneManager != null}");
         if (sceneManager != null)
         {

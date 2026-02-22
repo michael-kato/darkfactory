@@ -22,23 +22,15 @@ public class OrbitCamera : MonoBehaviour
         _pitch = angles.x;
 
         if (target != null)
-        {
             _targetPosition = target.position;
-        }
         else
-        {
             _targetPosition = Vector3.zero;
-        }
 
         UpdateCameraPosition();
     }
 
     private void Update()
     {
-#if UNITY_EDITOR
-        if (!UnityEditor.EditorApplication.isPlaying) return;
-#endif
-        
         if (Input.GetMouseButton(1))
         {
             _yaw += Input.GetAxis("Mouse X") * sensitivity;
@@ -54,7 +46,6 @@ public class OrbitCamera : MonoBehaviour
         {
             float moveX = -Input.GetAxis("Mouse X") * sensitivity * 0.1f * distance;
             float moveY = -Input.GetAxis("Mouse Y") * sensitivity * 0.1f * distance;
-            
             Quaternion rotation = Quaternion.Euler(0, _yaw, 0);
             _targetPosition += rotation * new Vector3(moveX, moveY, 0);
         }
@@ -72,7 +63,7 @@ public class OrbitCamera : MonoBehaviour
         if (sceneManager == null) return;
 
         Ray ray = GetComponent<Camera>().ScreenPointToRay(Input.mousePosition);
-        SDFPrimitive[] primitives = FindObjectsOfType<SDFPrimitive>();
+        SDFPrimitive[] primitives = FindObjectsByType<SDFPrimitive>(FindObjectsSortMode.None);
         
         SDFPrimitive closestPrimitive = null;
         float closestDistance = float.MaxValue;

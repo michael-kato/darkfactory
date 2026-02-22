@@ -70,7 +70,7 @@ public class SDFSceneManager : MonoBehaviour
     {
         int count = _primitives.Count;
         _primitives.Clear();
-        _primitives.AddRange(FindObjectsOfType<SDFPrimitive>());
+        _primitives.AddRange(FindObjectsByType<SDFPrimitive>(FindObjectsSortMode.None));
         
         if (_prevPositions.Length < _primitives.Count)
         {

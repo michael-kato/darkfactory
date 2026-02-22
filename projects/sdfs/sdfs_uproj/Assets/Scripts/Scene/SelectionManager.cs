@@ -14,7 +14,7 @@ public class SelectionManager : MonoBehaviour
 
     private void OnSelectionChanged(SDFPrimitive selectedPrimitive)
     {
-        SDFPrimitive[] allPrimitives = FindObjectsOfType<SDFPrimitive>();
+        SDFPrimitive[] allPrimitives = FindObjectsByType<SDFPrimitive>(FindObjectsSortMode.None);
         foreach (var prim in allPrimitives)
         {
             prim.IsSelected = (prim == selectedPrimitive);

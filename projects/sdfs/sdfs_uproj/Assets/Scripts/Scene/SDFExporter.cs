@@ -110,7 +110,7 @@ public class SDFExporter : MonoBehaviour
         
         float d = float.MaxValue;
         
-        SDFPrimitive[] primitives = FindObjectsOfType<SDFPrimitive>();
+        SDFPrimitive[] primitives = FindObjectsByType<SDFPrimitive>(FindObjectsSortMode.None);
         foreach (var prim in primitives)
         {
             float primD = GetPrimitiveDistance(p, prim);
