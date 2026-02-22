@@ -1,11 +1,16 @@
 """
 tools/generate_test_assets.py
-Procedurally generates known-good and known-bad 3D assets for pipeline testing.
+Procedurally generates known-bad 3D assets for pipeline testing.
+
+Design rules:
+  - Minimum triangles needed to reproduce the error — nothing more.
+  - Only the components required for the specific check are included.
+    Geometry checks need no material or UV. UV checks need no material.
+    Material/PBR checks need a material but minimal geometry.
+  - Mesh names end in _01 and increment as new examples are added.
 
 Usage:
     blender --background --python tools/generate_test_assets.py -- projects/asscheck/assets
-
-Each generator function documents which pipeline check it is designed to trigger.
 """
 
 import sys
@@ -41,308 +46,242 @@ def export_glb(path: Path):
     print(f"  wrote {path.relative_to(path.parents[3])}")
 
 
-def add_principled_material(obj, name="material"):
-    mat = bpy.data.materials.new(name)
-    mat.use_nodes = True
-    # Default node tree already has Principled BSDF → Material Output
+def make_mesh(name: str, verts, faces):
+    """Create a mesh object from raw vert/face lists. Returns obj."""
+    mesh = bpy.data.meshes.new(name)
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.scene.collection.objects.link(obj)
+    mesh.from_pydata(verts, [], faces)
+    mesh.update()
+    return obj
+
+
+TRIANGLE_VERTS = [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.5, 1.0, 0.0)]
+TRIANGLE_FACES = [(0, 1, 2)]
+TRIANGLE_UVS   = [(0.0, 0.0), (1.0, 0.0), (0.5, 1.0)]
+
+
+def single_triangle(name: str):
+    return make_mesh(name, TRIANGLE_VERTS, TRIANGLE_FACES)
+
+
+def set_triangle_uvs(obj, uvs=TRIANGLE_UVS):
+    uv_layer = obj.data.uv_layers.new(name="UVMap")
+    for i, uv in enumerate(uvs):
+        uv_layer.data[i].uv = uv
+
+
+def add_principled_material(obj, name=None):
+    mat = bpy.data.materials.new(name or (obj.name + "_mat"))
+    mat.use_nodes = True  # default node tree: Principled BSDF → Material Output
     obj.data.materials.append(mat)
     return mat
 
 
 # ---------------------------------------------------------------------------
-# Known-good
-# ---------------------------------------------------------------------------
-
-def make_clean_mesh(out_dir: Path):
-    """
-    Simple cube with UVs and a Principled BSDF material.
-    Passes all stage1a–1d checks for category env_prop.
-    Triangle count: 12 (within env_prop 500–5000 budget with a permissive min).
-    NOTE: for budget tests use a subdivided version (see make_within_budget below).
-    """
-    clear_scene()
-    bpy.ops.mesh.primitive_cube_add()
-    obj = bpy.context.active_object
-    obj.name = "clean_prop"
-
-    bpy.ops.object.mode_set(mode='EDIT')
-    bpy.ops.mesh.select_all(action='SELECT')
-    bpy.ops.uv.smart_project()
-    bpy.ops.object.mode_set(mode='OBJECT')
-
-    add_principled_material(obj, "clean_mat")
-    export_glb(out_dir / "known-good" / "clean_mesh.glb")
-
-
-def make_within_budget(out_dir: Path):
-    """
-    Subdivided cube with ~768 triangles — within env_prop budget (500–5000).
-    Use this as the baseline for geometry integration tests.
-    """
-    clear_scene()
-    bpy.ops.mesh.primitive_cube_add()
-    obj = bpy.context.active_object
-    obj.name = "within_budget_prop"
-
-    bpy.ops.object.mode_set(mode='EDIT')
-    bpy.ops.mesh.subdivide(number_cuts=4)
-    bpy.ops.mesh.select_all(action='SELECT')
-    bpy.ops.uv.smart_project()
-    bpy.ops.object.mode_set(mode='OBJECT')
-
-    add_principled_material(obj, "budget_mat")
-    export_glb(out_dir / "known-good" / "within_budget.glb")
-
-
-# ---------------------------------------------------------------------------
 # Known-bad: geometry (stage1a)
+# No material or UV needed — geometry checks operate on mesh topology only.
 # ---------------------------------------------------------------------------
 
-def make_non_manifold(out_dir: Path):
+def make_non_manifold_01(out_dir: Path):
     """
-    Cube with one face deleted → 4 open boundary edges.
-    Triggers: stage1a non_manifold check (measured_value == 4).
-    """
-    clear_scene()
-    bpy.ops.mesh.primitive_cube_add()
-    obj = bpy.context.active_object
-    obj.name = "non_manifold_prop"
-
-    bpy.ops.object.mode_set(mode='EDIT')
-    bm = bmesh.from_edit_mesh(obj.data)
-    bm.faces.ensure_lookup_table()
-    bmesh.ops.delete(bm, geom=[bm.faces[0]], context='FACES')
-    bmesh.update_edit_mesh(obj.data)
-    bpy.ops.object.mode_set(mode='OBJECT')
-
-    export_glb(out_dir / "known-bad" / "non_manifold.glb")
-
-
-def make_degenerate_faces(out_dir: Path):
-    """
-    Mesh with a zero-area triangle (3 collinear vertices at z=0).
-    Triggers: stage1a degenerate_faces check.
+    Single triangle.
+    Its 3 edges are each shared by only 1 face → all 3 are non-manifold.
+    Triggers: non_manifold check (measured_value == 3).
     """
     clear_scene()
-    mesh = bpy.data.meshes.new("degenerate_mesh")
-    obj = bpy.data.objects.new("degenerate_prop", mesh)
-    bpy.context.scene.collection.objects.link(obj)
+    single_triangle("non_manifold_01")
+    export_glb(out_dir / "known-bad" / "non_manifold_01.glb")
 
-    # A valid cube base via from_pydata
+
+def make_degenerate_faces_01(out_dir: Path):
+    """
+    Single triangle whose 3 vertices are collinear (zero area).
+    Triggers: degenerate_faces check (measured_value == 1).
+    """
+    clear_scene()
+    verts = [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (2.0, 0.0, 0.0)]  # collinear on x-axis
+    make_mesh("degenerate_faces_01", verts, [(0, 1, 2)])
+    export_glb(out_dir / "known-bad" / "degenerate_faces_01.glb")
+
+
+def make_flipped_normals_01(out_dir: Path):
+    """
+    Tetrahedron (4 triangles, closed manifold) with one face's winding reversed.
+    The reversed face's normal points inward while its neighbours point outward.
+    Triggers: normal_consistency check.
+    Minimum closed shape that gives the checker meaningful neighbour context.
+    """
+    clear_scene()
+    s = 1.0
     verts = [
-        (-1, -1, -1), (1, -1, -1), (1, 1, -1), (-1, 1, -1),
-        (-1, -1,  1), (1, -1,  1), (1, 1,  1), (-1, 1,  1),
-        # 3 collinear verts for the degenerate face
-        (3, 0, 0), (4, 0, 0), (5, 0, 0),
+        ( s,  s,  s),
+        ( s, -s, -s),
+        (-s,  s, -s),
+        (-s, -s,  s),
     ]
     faces = [
-        (0,1,2,3), (4,5,6,7), (0,1,5,4),
-        (1,2,6,5), (2,3,7,6), (3,0,4,7),
-        (8, 9, 10),  # degenerate zero-area triangle
+        (2, 1, 0),   # face 0: winding reversed → normal points inward
+        (0, 1, 3),
+        (1, 2, 3),
+        (0, 2, 3),
     ]
-    mesh.from_pydata(verts, [], faces)
-    mesh.update()
-
-    export_glb(out_dir / "known-bad" / "degenerate_faces.glb")
+    make_mesh("flipped_normals_01", verts, faces)
+    export_glb(out_dir / "known-bad" / "flipped_normals_01.glb")
 
 
-def make_flipped_normals(out_dir: Path):
+def make_loose_geometry_01(out_dir: Path):
     """
-    Cube with 3 faces having reversed normals.
-    Triggers: stage1a normal_consistency check.
+    Two connected triangles (share an edge, forming a diamond) plus one isolated vertex.
+    Triggers: loose_geometry check (measured_value == 1 isolated vert).
     """
     clear_scene()
-    bpy.ops.mesh.primitive_cube_add()
-    obj = bpy.context.active_object
-    obj.name = "flipped_normals_prop"
+    verts = [
+        (0.0,  0.0, 0.0),   # 0 — shared by both tris
+        (1.0,  0.0, 0.0),   # 1 — shared by both tris
+        (0.5,  0.5, 0.0),   # 2 — top
+        (0.5, -0.5, 0.0),   # 3 — bottom
+        (5.0,  0.0, 0.0),   # 4 — isolated, no faces
+    ]
+    faces = [(0, 1, 2), (0, 1, 3)]
+    make_mesh("loose_geometry_01", verts, faces)
+    export_glb(out_dir / "known-bad" / "loose_geometry_01.glb")
 
+
+def make_overbudget_tris_01(out_dir: Path):
+    """
+    Grid of 5100 triangles — just over the env_prop max budget (5000).
+    51 × 50 quads = 2550 quads → 5100 triangles when triangulated.
+    Triggers: polycount_budget check (over max).
+    """
+    clear_scene()
+    bpy.ops.mesh.primitive_grid_add(x_subdivisions=51, y_subdivisions=50)
+    obj = bpy.context.active_object
+    obj.name = "overbudget_tris_01"
+    obj.data.name = "overbudget_tris_01"
+
+    # Triangulate so the triangle count is exact on export
     bpy.ops.object.mode_set(mode='EDIT')
-    bm = bmesh.from_edit_mesh(obj.data)
-    bm.faces.ensure_lookup_table()
-    bmesh.ops.reverse_faces(bm, faces=bm.faces[:3])
-    bmesh.update_edit_mesh(obj.data)
+    bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.mesh.quads_convert_to_tris()
     bpy.ops.object.mode_set(mode='OBJECT')
 
-    export_glb(out_dir / "known-bad" / "flipped_normals.glb")
+    export_glb(out_dir / "known-bad" / "overbudget_tris_01.glb")
 
 
-def make_loose_geometry(out_dir: Path):
+def make_underbudget_tris_01(out_dir: Path):
     """
-    Cube with 5 extra unconnected vertices.
-    Triggers: stage1a loose_geometry check (measured_value >= 5).
-    """
-    clear_scene()
-    bpy.ops.mesh.primitive_cube_add()
-    obj = bpy.context.active_object
-    obj.name = "loose_geo_prop"
-
-    bpy.ops.object.mode_set(mode='EDIT')
-    bm = bmesh.from_edit_mesh(obj.data)
-    for i in range(5):
-        bm.verts.new(Vector((5.0 + i * 0.3, 0.0, 0.0)))
-    bmesh.update_edit_mesh(obj.data)
-    bpy.ops.object.mode_set(mode='OBJECT')
-
-    export_glb(out_dir / "known-bad" / "loose_geometry.glb")
-
-
-def make_overbudget_tris(out_dir: Path):
-    """
-    Icosphere subdivided to ~20480 triangles — exceeds env_prop max budget (5000).
-    Triggers: stage1a polycount_budget check (FAIL, over max).
+    Single triangle — clearly below the env_prop min budget (500).
+    Triggers: polycount_budget check (under min).
+    Note: also non-manifold (boundary edges), but the primary signal is polycount.
     """
     clear_scene()
-    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=5)
-    obj = bpy.context.active_object
-    obj.name = "overbudget_prop"
-
-    export_glb(out_dir / "known-bad" / "overbudget_tris.glb")
-
-
-def make_underbudget_tris(out_dir: Path):
-    """
-    Single triangle — below env_prop min budget (500 triangles).
-    Triggers: stage1a polycount_budget check (FAIL, under min).
-    """
-    clear_scene()
-    mesh = bpy.data.meshes.new("underbudget_mesh")
-    obj = bpy.data.objects.new("underbudget_prop", mesh)
-    bpy.context.scene.collection.objects.link(obj)
-
-    verts = [(0, 0, 0), (1, 0, 0), (0.5, 1, 0)]
-    faces = [(0, 1, 2)]
-    mesh.from_pydata(verts, [], faces)
-    mesh.update()
-
-    export_glb(out_dir / "known-bad" / "underbudget_tris.glb")
+    single_triangle("underbudget_tris_01")
+    export_glb(out_dir / "known-bad" / "underbudget_tris_01.glb")
 
 
 # ---------------------------------------------------------------------------
 # Known-bad: UV (stage1b)
+# No material needed — UV checks operate on the mesh UV layer only.
 # ---------------------------------------------------------------------------
 
-def make_no_uvs(out_dir: Path):
+def make_no_uvs_01(out_dir: Path):
     """
-    Cube with all UV layers removed.
-    Triggers: stage1b missing_uvs check.
-    """
-    clear_scene()
-    bpy.ops.mesh.primitive_cube_add()
-    obj = bpy.context.active_object
-    obj.name = "no_uvs_prop"
-
-    while obj.data.uv_layers:
-        obj.data.uv_layers.remove(obj.data.uv_layers[0])
-
-    export_glb(out_dir / "known-bad" / "no_uvs.glb")
-
-
-def make_uvs_out_of_bounds(out_dir: Path):
-    """
-    Cube where all UV coordinates are shifted to U=2.x, V=2.x (outside [0,1]).
-    Triggers: stage1b uv_bounds check.
+    Single triangle with no UV layer.
+    Triggers: missing_uvs check.
     """
     clear_scene()
-    bpy.ops.mesh.primitive_cube_add()
-    obj = bpy.context.active_object
-    obj.name = "oob_uvs_prop"
-
-    bpy.ops.object.mode_set(mode='EDIT')
-    bpy.ops.mesh.select_all(action='SELECT')
-    bpy.ops.uv.smart_project()
-    bpy.ops.object.mode_set(mode='OBJECT')
-
-    uv_layer = obj.data.uv_layers.active
-    for loop_uv in uv_layer.data:
-        loop_uv.uv[0] += 2.0
-        loop_uv.uv[1] += 2.0
-
-    export_glb(out_dir / "known-bad" / "uvs_out_of_bounds.glb")
+    single_triangle("no_uvs_01")
+    # No UV layer added — that's the whole point.
+    export_glb(out_dir / "known-bad" / "no_uvs_01.glb")
 
 
-def make_uv_overlap(out_dir: Path):
+def make_uvs_out_of_bounds_01(out_dir: Path):
     """
-    Two-face plane where both faces have identical UV coordinates (fully overlapping islands).
-    Triggers: stage1b uv_overlap check.
+    Single triangle with UV coordinates at (2.5, 2.5) — outside [0, 1].
+    Triggers: uv_bounds check.
     """
     clear_scene()
-    bpy.ops.mesh.primitive_plane_add()
-    obj = bpy.context.active_object
-    obj.name = "uv_overlap_prop"
+    obj = single_triangle("uvs_out_of_bounds_01")
+    set_triangle_uvs(obj, [(2.5, 2.5), (3.5, 2.5), (3.0, 3.5)])
+    export_glb(out_dir / "known-bad" / "uvs_out_of_bounds_01.glb")
 
-    # Subdivide to get two faces
-    bpy.ops.object.mode_set(mode='EDIT')
-    bpy.ops.mesh.subdivide(number_cuts=1)
-    bpy.ops.uv.smart_project()
-    bpy.ops.object.mode_set(mode='OBJECT')
 
-    # Force all UV coords to the same small square → total overlap
-    uv_layer = obj.data.uv_layers.active
-    for loop_uv in uv_layer.data:
-        loop_uv.uv[0] = 0.1
-        loop_uv.uv[1] = 0.1
+def make_uv_overlap_01(out_dir: Path):
+    """
+    Two triangles occupying identical UV space (both mapped to the same coords).
+    Triggers: uv_overlap check.
+    """
+    clear_scene()
+    # Two coplanar triangles side by side in 3D, but same UV coords
+    verts = [
+        (0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.5, 1.0, 0.0),  # tri 0
+        (2.0, 0.0, 0.0), (3.0, 0.0, 0.0), (2.5, 1.0, 0.0),  # tri 1
+    ]
+    faces = [(0, 1, 2), (3, 4, 5)]
+    obj = make_mesh("uv_overlap_01", verts, faces)
 
-    export_glb(out_dir / "known-bad" / "uv_overlap.glb")
+    # Both faces use the same UV coordinates → complete overlap
+    uv_layer = obj.data.uv_layers.new(name="UVMap")
+    for i in range(6):
+        uv_layer.data[i].uv = TRIANGLE_UVS[i % 3]
+
+    export_glb(out_dir / "known-bad" / "uv_overlap_01.glb")
 
 
 # ---------------------------------------------------------------------------
 # Known-bad: materials / PBR (stage1c / stage1d)
 # ---------------------------------------------------------------------------
 
-def make_non_pbr_material(out_dir: Path):
+def make_non_pbr_material_01(out_dir: Path):
     """
-    Cube with an Emission shader instead of Principled BSDF.
-    Triggers: stage1d pbr_workflow check.
+    Single triangle with an Emission shader instead of Principled BSDF.
+    Triggers: pbr_workflow check.
     """
     clear_scene()
-    bpy.ops.mesh.primitive_cube_add()
-    obj = bpy.context.active_object
-    obj.name = "non_pbr_prop"
+    obj = single_triangle("non_pbr_material_01")
+    set_triangle_uvs(obj)
 
-    mat = bpy.data.materials.new("emission_mat")
+    mat = bpy.data.materials.new("non_pbr_material_01_mat")
     mat.use_nodes = True
     nodes = mat.node_tree.nodes
     links = mat.node_tree.links
     nodes.clear()
-
     emission = nodes.new('ShaderNodeEmission')
-    emission.inputs['Color'].default_value = (1.0, 0.5, 0.0, 1.0)
+    emission.inputs['Color'].default_value = (1.0, 0.4, 0.0, 1.0)
     output = nodes.new('ShaderNodeOutputMaterial')
     links.new(emission.outputs['Emission'], output.inputs['Surface'])
-
     obj.data.materials.append(mat)
-    export_glb(out_dir / "known-bad" / "non_pbr_material.glb")
+
+    export_glb(out_dir / "known-bad" / "non_pbr_material_01.glb")
 
 
-def make_wrong_colorspace_normal(out_dir: Path):
+def make_wrong_colorspace_normal_01(out_dir: Path):
     """
-    Cube with a normal map node connected but colorspace set to sRGB (should be Non-Color).
-    Triggers: stage1d normal_map colorspace check.
+    Single triangle with a normal map connected to Principled BSDF
+    but colorspace set to sRGB instead of Non-Color.
+    Triggers: normal_map colorspace check.
     """
     clear_scene()
-    bpy.ops.mesh.primitive_cube_add()
-    obj = bpy.context.active_object
-    obj.name = "wrong_colorspace_prop"
+    obj = single_triangle("wrong_colorspace_normal_01")
+    set_triangle_uvs(obj)
 
-    # Create a flat blue image to simulate a normal map
-    img = bpy.data.images.new("fake_normal", width=64, height=64)
-    img.colorspace_settings.name = 'sRGB'  # wrong — should be Non-Color
+    img = bpy.data.images.new("fake_normal_01", width=4, height=4)
+    img.colorspace_settings.name = 'sRGB'  # intentionally wrong
 
-    mat = bpy.data.materials.new("wrong_colorspace_mat")
+    mat = bpy.data.materials.new("wrong_colorspace_normal_01_mat")
     mat.use_nodes = True
     nodes = mat.node_tree.nodes
     links = mat.node_tree.links
-
     bsdf = nodes.get('Principled BSDF')
-    tex_node = nodes.new('ShaderNodeTexImage')
-    tex_node.image = img
-    normal_map = nodes.new('ShaderNodeNormalMap')
-
-    links.new(tex_node.outputs['Color'], normal_map.inputs['Color'])
-    links.new(normal_map.outputs['Normal'], bsdf.inputs['Normal'])
-
+    tex  = nodes.new('ShaderNodeTexImage')
+    tex.image = img
+    nmap = nodes.new('ShaderNodeNormalMap')
+    links.new(tex.outputs['Color'], nmap.inputs['Color'])
+    links.new(nmap.outputs['Normal'], bsdf.inputs['Normal'])
     obj.data.materials.append(mat)
-    export_glb(out_dir / "known-bad" / "wrong_colorspace_normal.glb")
+
+    export_glb(out_dir / "known-bad" / "wrong_colorspace_normal_01.glb")
 
 
 # ---------------------------------------------------------------------------
@@ -350,23 +289,20 @@ def make_wrong_colorspace_normal(out_dir: Path):
 # ---------------------------------------------------------------------------
 
 GENERATORS = [
-    # known-good
-    make_clean_mesh,
-    make_within_budget,
-    # geometry
-    make_non_manifold,
-    make_degenerate_faces,
-    make_flipped_normals,
-    make_loose_geometry,
-    make_overbudget_tris,
-    make_underbudget_tris,
-    # UV
-    make_no_uvs,
-    make_uvs_out_of_bounds,
-    make_uv_overlap,
-    # material / PBR
-    make_non_pbr_material,
-    make_wrong_colorspace_normal,
+    # geometry (stage1a)
+    make_non_manifold_01,
+    make_degenerate_faces_01,
+    make_flipped_normals_01,
+    make_loose_geometry_01,
+    make_overbudget_tris_01,
+    make_underbudget_tris_01,
+    # UV (stage1b)
+    make_no_uvs_01,
+    make_uvs_out_of_bounds_01,
+    make_uv_overlap_01,
+    # material / PBR (stage1c / stage1d)
+    make_non_pbr_material_01,
+    make_wrong_colorspace_normal_01,
 ]
 
 
@@ -391,7 +327,8 @@ if __name__ == "__main__":
         try:
             gen(out_dir)
         except Exception as exc:
-            print(f"  FAILED: {exc}")
+            import traceback
+            traceback.print_exc()
             failed.append((gen.__name__, exc))
 
     print(f"\n[generate] done — {len(GENERATORS) - len(failed)}/{len(GENERATORS)} succeeded")
