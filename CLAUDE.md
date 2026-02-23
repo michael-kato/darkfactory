@@ -39,4 +39,4 @@ darkfactory/
 
 | Project | Description | Stack |
 |---|---|---|
-| asscheck | 3D asset QA pipeline for VR games | Python, Blender headless, Unity 6 |
+| asscheck | 3D asset QA pipeline for VR games — geometry/UV/texture/PBR/armature checks before Unity import | Python · Blender 5.0.1 headless · Unity 6 |

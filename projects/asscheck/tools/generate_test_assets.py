@@ -7,7 +7,7 @@ Design rules:
   - Only the components required for the specific check are included.
     Geometry checks need no material or UV. UV checks need no material.
     Material/PBR checks need a material but minimal geometry.
-  - Mesh names end in _01 and increment as new examples are added.
+  - Mesh names are descriptive of the error they contain.
 
 Usage:
     blender --background --python tools/generate_test_assets.py -- projects/asscheck/assets
@@ -80,196 +80,175 @@ def add_principled_material(obj, name=None):
 
 # ---------------------------------------------------------------------------
 # Known-bad: geometry (stage1a)
-# No material or UV needed — geometry checks operate on mesh topology only.
 # ---------------------------------------------------------------------------
 
-def make_non_manifold_01(out_dir: Path):
+def make_non_manifold(out_dir: Path):
     """
-    Single triangle.
-    Its 3 edges are each shared by only 1 face → all 3 are non-manifold.
-    Triggers: non_manifold check (measured_value == 3).
+    Single triangle. Boundary edges are non-manifold.
+    Triggers: non_manifold check.
     """
     clear_scene()
-    single_triangle("non_manifold_01")
-    export_glb(out_dir / "known-bad" / "non_manifold_01.glb")
+    single_triangle("non_manifold")
+    export_glb(out_dir / "known-bad" / "non_manifold.glb")
 
 
-def make_degenerate_faces_01(out_dir: Path):
+def make_degenerate_faces(out_dir: Path):
     """
     Single triangle whose 3 vertices are collinear (zero area).
-    Triggers: degenerate_faces check (measured_value == 1).
+    Triggers: degenerate_faces check.
     """
     clear_scene()
-    verts = [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (2.0, 0.0, 0.0)]  # collinear on x-axis
-    make_mesh("degenerate_faces_01", verts, [(0, 1, 2)])
-    export_glb(out_dir / "known-bad" / "degenerate_faces_01.glb")
+    verts = [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (2.0, 0.0, 0.0)]
+    make_mesh("degenerate_faces", verts, [(0, 1, 2)])
+    export_glb(out_dir / "known-bad" / "degenerate_faces.glb")
 
 
-def make_flipped_normals_01(out_dir: Path):
+def make_flipped_normals(out_dir: Path):
     """
-    Tetrahedron (4 triangles, closed manifold) with one face's winding reversed.
-    The reversed face's normal points inward while its neighbours point outward.
+    Tetrahedron with one face's winding reversed.
     Triggers: normal_consistency check.
-    Minimum closed shape that gives the checker meaningful neighbour context.
     """
     clear_scene()
     s = 1.0
-    verts = [
-        ( s,  s,  s),
-        ( s, -s, -s),
-        (-s,  s, -s),
-        (-s, -s,  s),
-    ]
+    verts = [(s, s, s), (s, -s, -s), (-s, s, -s), (-s, -s, s)]
     faces = [
-        (2, 1, 0),   # face 0: winding reversed → normal points inward
+        (2, 1, 0),   # reversed
         (0, 1, 3),
         (1, 2, 3),
         (0, 2, 3),
     ]
-    make_mesh("flipped_normals_01", verts, faces)
-    export_glb(out_dir / "known-bad" / "flipped_normals_01.glb")
+    make_mesh("flipped_normals", verts, faces)
+    export_glb(out_dir / "known-bad" / "flipped_normals.glb")
 
 
-def make_loose_geometry_01(out_dir: Path):
+def make_loose_geometry(out_dir: Path):
     """
-    Two connected triangles (share an edge, forming a diamond) plus one isolated vertex.
-    Triggers: loose_geometry check (measured_value == 1 isolated vert).
+    Two connected triangles plus one isolated vertex.
+    Triggers: loose_geometry check.
     """
     clear_scene()
     verts = [
-        (0.0,  0.0, 0.0),   # 0 — shared by both tris
-        (1.0,  0.0, 0.0),   # 1 — shared by both tris
-        (0.5,  0.5, 0.0),   # 2 — top
-        (0.5, -0.5, 0.0),   # 3 — bottom
-        (5.0,  0.0, 0.0),   # 4 — isolated, no faces
+        (0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.5, 0.5, 0.0),
+        (0.5, -0.5, 0.0), (5.0, 0.0, 0.0), # isolated
     ]
     faces = [(0, 1, 2), (0, 1, 3)]
-    make_mesh("loose_geometry_01", verts, faces)
-    export_glb(out_dir / "known-bad" / "loose_geometry_01.glb")
+    make_mesh("loose_geometry", verts, faces)
+    export_glb(out_dir / "known-bad" / "loose_geometry.glb")
 
 
-def make_overbudget_tris_01(out_dir: Path):
+def make_overbudget_tris(out_dir: Path):
     """
-    Grid of 5100 triangles — just over the env_prop max budget (5000).
-    51 × 50 quads = 2550 quads → 5100 triangles when triangulated.
-    Triggers: polycount_budget check (over max).
+    Grid of 5100 triangles — over max budget.
+    Triggers: polycount_budget check.
     """
     clear_scene()
     bpy.ops.mesh.primitive_grid_add(x_subdivisions=51, y_subdivisions=50)
     obj = bpy.context.active_object
-    obj.name = "overbudget_tris_01"
-    obj.data.name = "overbudget_tris_01"
+    obj.name = "overbudget_tris"
+    obj.data.name = "overbudget_tris"
 
-    # Triangulate so the triangle count is exact on export
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.select_all(action='SELECT')
     bpy.ops.mesh.quads_convert_to_tris()
     bpy.ops.object.mode_set(mode='OBJECT')
 
-    export_glb(out_dir / "known-bad" / "overbudget_tris_01.glb")
+    export_glb(out_dir / "known-bad" / "overbudget_tris.glb")
 
 
-def make_underbudget_tris_01(out_dir: Path):
+def make_underbudget_tris(out_dir: Path):
     """
-    Single triangle — clearly below the env_prop min budget (500).
-    Triggers: polycount_budget check (under min).
-    Note: also non-manifold (boundary edges), but the primary signal is polycount.
+    Single triangle — under min budget.
+    Triggers: polycount_budget check.
     """
     clear_scene()
-    single_triangle("underbudget_tris_01")
-    export_glb(out_dir / "known-bad" / "underbudget_tris_01.glb")
+    single_triangle("underbudget_tris")
+    export_glb(out_dir / "known-bad" / "underbudget_tris.glb")
 
 
 # ---------------------------------------------------------------------------
 # Known-bad: UV (stage1b)
-# No material needed — UV checks operate on the mesh UV layer only.
 # ---------------------------------------------------------------------------
 
-def make_no_uvs_01(out_dir: Path):
+def make_no_uvs(out_dir: Path):
     """
     Single triangle with no UV layer.
     Triggers: missing_uvs check.
     """
     clear_scene()
-    single_triangle("no_uvs_01")
-    # No UV layer added — that's the whole point.
-    export_glb(out_dir / "known-bad" / "no_uvs_01.glb")
+    single_triangle("no_uvs")
+    export_glb(out_dir / "known-bad" / "no_uvs.glb")
 
 
-def make_uvs_out_of_bounds_01(out_dir: Path):
+def make_uvs_out_of_bounds(out_dir: Path):
     """
-    Single triangle with UV coordinates at (2.5, 2.5) — outside [0, 1].
+    Single triangle with UV coordinates outside [0, 1].
     Triggers: uv_bounds check.
     """
     clear_scene()
-    obj = single_triangle("uvs_out_of_bounds_01")
+    obj = single_triangle("uvs_out_of_bounds")
     set_triangle_uvs(obj, [(2.5, 2.5), (3.5, 2.5), (3.0, 3.5)])
-    export_glb(out_dir / "known-bad" / "uvs_out_of_bounds_01.glb")
+    export_glb(out_dir / "known-bad" / "uvs_out_of_bounds.glb")
 
 
-def make_uv_overlap_01(out_dir: Path):
+def make_uv_overlap(out_dir: Path):
     """
-    Two triangles occupying identical UV space (both mapped to the same coords).
+    Two triangles occupying identical UV space.
     Triggers: uv_overlap check.
     """
     clear_scene()
-    # Two coplanar triangles side by side in 3D, but same UV coords
     verts = [
-        (0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.5, 1.0, 0.0),  # tri 0
-        (2.0, 0.0, 0.0), (3.0, 0.0, 0.0), (2.5, 1.0, 0.0),  # tri 1
+        (0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.5, 1.0, 0.0),
+        (2.0, 0.0, 0.0), (3.0, 0.0, 0.0), (2.5, 1.0, 0.0),
     ]
     faces = [(0, 1, 2), (3, 4, 5)]
-    obj = make_mesh("uv_overlap_01", verts, faces)
+    obj = make_mesh("uv_overlap", verts, faces)
 
-    # Both faces use the same UV coordinates → complete overlap
     uv_layer = obj.data.uv_layers.new(name="UVMap")
     for i in range(6):
         uv_layer.data[i].uv = TRIANGLE_UVS[i % 3]
 
-    export_glb(out_dir / "known-bad" / "uv_overlap_01.glb")
+    export_glb(out_dir / "known-bad" / "uv_overlap.glb")
 
 
 # ---------------------------------------------------------------------------
 # Known-bad: materials / PBR (stage1c / stage1d)
 # ---------------------------------------------------------------------------
 
-def make_non_pbr_material_01(out_dir: Path):
+def make_non_pbr_material(out_dir: Path):
     """
     Single triangle with an Emission shader instead of Principled BSDF.
     Triggers: pbr_workflow check.
     """
     clear_scene()
-    obj = single_triangle("non_pbr_material_01")
+    obj = single_triangle("non_pbr_material")
     set_triangle_uvs(obj)
 
-    mat = bpy.data.materials.new("non_pbr_material_01_mat")
+    mat = bpy.data.materials.new("non_pbr_material_mat")
     mat.use_nodes = True
     nodes = mat.node_tree.nodes
     links = mat.node_tree.links
     nodes.clear()
     emission = nodes.new('ShaderNodeEmission')
-    emission.inputs['Color'].default_value = (1.0, 0.4, 0.0, 1.0)
     output = nodes.new('ShaderNodeOutputMaterial')
     links.new(emission.outputs['Emission'], output.inputs['Surface'])
     obj.data.materials.append(mat)
 
-    export_glb(out_dir / "known-bad" / "non_pbr_material_01.glb")
+    export_glb(out_dir / "known-bad" / "non_pbr_material.glb")
 
 
-def make_wrong_colorspace_normal_01(out_dir: Path):
+def make_wrong_colorspace_normal(out_dir: Path):
     """
-    Single triangle with a normal map connected to Principled BSDF
-    but colorspace set to sRGB instead of Non-Color.
+    Normal map set to sRGB instead of Non-Color.
     Triggers: normal_map colorspace check.
     """
     clear_scene()
-    obj = single_triangle("wrong_colorspace_normal_01")
+    obj = single_triangle("wrong_colorspace_normal")
     set_triangle_uvs(obj)
 
-    img = bpy.data.images.new("fake_normal_01", width=4, height=4)
-    img.colorspace_settings.name = 'sRGB'  # intentionally wrong
+    img = bpy.data.images.new("fake_normal", width=4, height=4)
+    img.colorspace_settings.name = 'sRGB'
 
-    mat = bpy.data.materials.new("wrong_colorspace_normal_01_mat")
+    mat = bpy.data.materials.new("wrong_colorspace_normal_mat")
     mat.use_nodes = True
     nodes = mat.node_tree.nodes
     links = mat.node_tree.links
@@ -281,7 +260,7 @@ def make_wrong_colorspace_normal_01(out_dir: Path):
     links.new(nmap.outputs['Normal'], bsdf.inputs['Normal'])
     obj.data.materials.append(mat)
 
-    export_glb(out_dir / "known-bad" / "wrong_colorspace_normal_01.glb")
+    export_glb(out_dir / "known-bad" / "wrong_colorspace_normal.glb")
 
 
 # ---------------------------------------------------------------------------
@@ -289,20 +268,17 @@ def make_wrong_colorspace_normal_01(out_dir: Path):
 # ---------------------------------------------------------------------------
 
 GENERATORS = [
-    # geometry (stage1a)
-    make_non_manifold_01,
-    make_degenerate_faces_01,
-    make_flipped_normals_01,
-    make_loose_geometry_01,
-    make_overbudget_tris_01,
-    make_underbudget_tris_01,
-    # UV (stage1b)
-    make_no_uvs_01,
-    make_uvs_out_of_bounds_01,
-    make_uv_overlap_01,
-    # material / PBR (stage1c / stage1d)
-    make_non_pbr_material_01,
-    make_wrong_colorspace_normal_01,
+    make_non_manifold,
+    make_degenerate_faces,
+    make_flipped_normals,
+    make_loose_geometry,
+    make_overbudget_tris,
+    make_underbudget_tris,
+    make_no_uvs,
+    make_uvs_out_of_bounds,
+    make_uv_overlap,
+    make_non_pbr_material,
+    make_wrong_colorspace_normal,
 ]
 
 

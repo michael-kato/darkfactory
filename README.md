@@ -44,7 +44,7 @@ project's own `test.sh`, so any language or test runner is supported.
 
 | Name | Description | Stack |
 |---|---|---|
-| [asscheck](projects/asscheck/) | 3D asset QA pipeline for VR games | Python · Blender headless · Unity 6 |
+| [asscheck](projects/asscheck/) | 3D asset QA pipeline for VR games — geometry/UV/texture/PBR/armature checks before Unity import | Python · Blender 5.0.1 headless · Unity 6 |
 
 ## Architecture
 

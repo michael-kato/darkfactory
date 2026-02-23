@@ -1,52 +1,147 @@
 # asscheck — Project Conventions
 
 ## What This Project Is
-3D asset QA pipeline for VR games. Validates and prepares Blender-exported assets
-for Unity using Blender headless (bpy/bmesh) and Unity Editor scripts (C#/AssetPostprocessor).
+3D asset QA pipeline for VR games. Validates Blender-exported assets before Unity import.
+Checks geometry, UVs, textures, PBR materials, armatures, and scene structure.
+Runs headless in CI: no display, no Unity Editor needed for most stages.
 
 ## Stack
-- Python 3.x + Blender 3.x/4.x headless — Stages 0–3
-- C# Unity 6 / URP — Stages 4–5
-- Unity project: `asscheck_uproj/`
-- Python package: `pipeline/` (to be built per specs)
+- **Python 3.x** — pipeline logic (Stages 0–3, Stage 5)
+- **Blender 5.0.1** headless — mesh inspection, UV analysis, texture checks, auto-repair
+  - Binary: `/opt/blender-5.0.1-linux-x64/blender`
+  - Run headless: `blender --background --python <script>.py`
+- **C# / Unity 6 / URP** — Stages 4a–4b (import config, runtime validation)
+  - Unity project: `asscheck_uproj/`
 
-## Project Structure (target)
+## Project Layout
 ```
 projects/asscheck/
-  pipeline/           Python QA pipeline package
-    stage0/           Intake & triage
-    stage1/           Analysis checks (geometry, uv, texture, pbr, armature, scene)
-    stage2/           Auto-remediation
-    stage3/           Export & handoff
-    stage4/           (orchestrates Unity import — invokes Unity CLI)
-    stage5/           Visual verification (renders, SSIM)
-  tests/              pytest unit tests (no Blender needed)
-  blender_tests/      Integration tests run via: blender --background --python <script>
-  asscheck_uproj/     Unity project
-  specs/              Work items for this project
-  .venv/              Python venv (create with: python -m venv .venv && pip install -r requirements.txt)
+  pipeline/           Python QA pipeline package (importable without Blender)
+    schema.py         Core types: QaReport, StageResult, CheckResult, enums
+    report_builder.py Utility for assembling the final QA report
+    stage0/
+      intake.py       run_intake(config) -> QaReport  (file validation, asset ID)
+    stage1/
+      geometry.py     check_geometry(ctx, config) -> StageResult
+      uv.py           check_uvs(ctx, config) -> StageResult
+      texture.py      check_textures(ctx, config) -> StageResult
+      pbr.py          check_pbr(ctx, config) -> StageResult
+      armature.py     check_armature(ctx, config) -> StageResult
+      scene.py        check_scene(ctx, config) -> StageResult
+      blender_runner.py  run_in_blender(script, args) -> dict  (subprocess helper)
+    stage2/
+      remediate.py    auto-fix geometry issues
+    stage3/
+      export.py       export-and-handoff logic
+    stage5/
+      turntable.py    render turntable images
+      ssim_diff.py    perceptual diff between renders
+      summary.py      final QA summary report
+  tests/              pytest unit tests — no Blender, use mock BlenderContext
+  blender_tests/      Integration tests: blender --background --python <script>.py
+  tools/
+    generate_test_assets.py   Procedurally generates known-bad GLBs via Blender bpy
+  assets/             GITIGNORED — real binary assets (gltf, glb, fbx, obj, textures)
+    known-bad/        Procedurally generated assets, one error each (see below)
+  asscheck_uproj/     Unity 6 project (URP)
+  specs/              Work items — acceptance criteria, not implementation
+  .venv/              Python venv
 ```
 
-## Test Commands
-- Unit tests: `python -m pytest tests/ -v` (from project root)
-- Blender tests: `blender --background --python blender_tests/<script>.py`
-- Unity tests: `Unity -batchmode -runTests -testPlatform editmode -logFile -`
+## Asset Directories
 
-## Code Conventions
-- Python: `pipeline/schema.py` types must be used for all QA data — no ad-hoc dicts
-- Validators return `StageResult` — never raw booleans
-- `BlenderContext` abstraction separates bpy-specific code from pure logic (enables unit testing)
-- Each spec's file paths are relative to this project root (`projects/asscheck/`)
-- Unity C#: namespace `QAPipeline`, scripts in `asscheck_uproj/Assets/Editor/QAPipeline/`
+### Real Assets (`assets/`) — gitignored, on disk only
+Used by integration tests. Skip (do not fail) if directory is missing (CI safety).
+| File | Format | Purpose |
+|---|---|---|
+| `street_lamp_01.gltf` + `.bin` | glTF | Standard env prop |
+| `large_iron_gate_left_door.glb` | GLB | Standard prop |
+| `tree_small_02_branches.fbx` | FBX | ~114 MB, used for size-limit tests |
+| `double_door_standard_01.obj` + `.mtl` | OBJ | Standard prop |
+
+Test files reference assets via:
+```python
+ASSETS_DIR = Path(__file__).parent.parent / "assets"
+```
+
+### Known-Bad Assets (`assets/known-bad/`) — gitignored, procedurally generated
+Minimum triangles needed to trigger exactly one check failure. No collateral errors.
+Generate or regenerate with:
+```
+blender --background --python tools/generate_test_assets.py -- projects/asscheck/assets
+```
+
+| File | Tris | Error demonstrated |
+|---|---|---|
+| `non_manifold.glb` | 1 | 3 boundary (non-manifold) edges |
+| `degenerate_faces.glb` | 1 | Collinear verts → zero-area face |
+| `flipped_normals.glb` | 4 | Tetrahedron with one face winding reversed |
+| `loose_geometry.glb` | 2+1vert | Two connected tris + one isolated vertex |
+| `overbudget_tris.glb` | 5100 | Exceeds env_prop max (5000 tris) |
+| `underbudget_tris.glb` | 1 | Below env_prop min (500 tris) |
+| `no_uvs.glb` | 1 | No UV layer present |
+| `uvs_out_of_bounds.glb` | 1 | UVs at (2.5, 2.5) — outside [0,1] |
+| `uv_overlap.glb` | 2 | Two tris mapped to identical UV space |
+| `non_pbr_material.glb` | 1 | Emission shader instead of Principled BSDF |
+| `wrong_colorspace_normal.glb` | 1 | Normal map with sRGB (should be Non-Color) |
+
+Design rules for known-bad assets:
+- Geometry checks: no UV layer, no material
+- UV checks: UV layer present, no material
+- Material/PBR checks: material present, minimal geometry
+
+## Two-Tier Test Strategy
+
+### Unit Tests (`tests/`) — fast, no Blender required
+Use mock `BlenderContext` objects to inject synthetic vertex/face/UV data.
+Tests check the check logic itself, not the Blender integration.
+Run with: `python -m pytest tests/ -v`
+
+### Integration Tests (`blender_tests/`) — requires Blender
+Run real pipeline stages against real and known-bad assets in `assets/`.
+Skip gracefully if `ASSETS_DIR` is missing (so CI can run unit tests only).
+Run with: `blender --background --python blender_tests/<script>.py`
+
+## Running Tests
+```bash
+# Unit tests (fast, no Blender)
+cd projects/asscheck && source .venv/bin/activate
+python -m pytest tests/ -v
+
+# Integration tests (requires Blender + assets/)
+/opt/blender-5.0.1-linux-x64/blender --background --python blender_tests/test_stage1a_blender.py
+```
+
+## Pipeline Stages & Status
+
+| Stage | Module | Status | Notes |
+|---|---|---|---|
+| 0-intake | `pipeline/stage0/intake.py` | Built | Format, size, asset ID |
+| 0-schema | `pipeline/schema.py` | Built | Core types |
+| 1a-geometry | `pipeline/stage1/geometry.py` | Built | polycount, non_manifold, degenerate, normals, loose |
+| 1b-uv | `pipeline/stage1/uv.py` | Built | missing uvs, bounds, overlap |
+| 1c-texture | `pipeline/stage1/texture.py` | Built | resolution, format, colorspace |
+| 1d-pbr | `pipeline/stage1/pbr.py` | Built | PBR workflow validation |
+| 1e-armature | `pipeline/stage1/armature.py` | Built | Skeleton checks |
+| 1f-scene | `pipeline/stage1/scene.py` | Built | Hierarchy and naming |
+| 2-remediation | `pipeline/stage2/remediate.py` | Built | Auto-fix geometry |
+| 3-export | `pipeline/stage3/export.py` | Built | Handoff packaging |
+| 4a-unity-import | `asscheck_uproj/Assets/Editor/` | Spec only | Unity-side import config |
+| 4b-unity-runtime | `asscheck_uproj/Assets/Editor/` | Spec only | Runtime validation |
+| 5-visual | `pipeline/stage5/` | Built | Turntable render + SSIM |
 
 ## Automated Commit Format
 - Subject: `[automated] asscheck: <description>`
-- Branch: `automation/asscheck/<spec-slug>`
+- Branch: commit directly to current branch — do not create a new branch
 
 ## Never Modify
-- `asscheck_uproj/Library/`
-- `asscheck_uproj/ProjectSettings/`
+- `asscheck_uproj/Library/`    — Unity generated, gitignored
+- `asscheck_uproj/Temp/`       — Unity generated, gitignored
 - `.git/`
 
-## Sample Asset
-`asscheck_uproj/Assets/Models/street_lamp_01_quant.gltf` — use for integration tests
+## Python Conventions
+- All QA data flows through types in `pipeline/schema.py` — no ad-hoc dicts
+- Validators return `StageResult`, never raw booleans
+- `BlenderContext` abstraction separates bpy-specific code from pure logic
+- File paths in specs are relative to `projects/asscheck/`
+- Unity C#: namespace `QAPipeline`, scripts in `asscheck_uproj/Assets/Editor/QAPipeline/`
