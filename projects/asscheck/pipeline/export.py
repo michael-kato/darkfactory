@@ -5,7 +5,7 @@ settings, writes the JSON sidecar manifest, and routes output files to the
 correct directory based on the overall QA status.
 
 The ``ExportBlenderContext`` ABC separates bpy export operators from pure
-routing and I/O logic, enabling unit tests that never import bpy.
+routing and I/O logic.
 """
 from __future__ import annotations
 
@@ -76,11 +76,11 @@ CATEGORY_FOLDER: dict[str, str] = {
 
 
 # ---------------------------------------------------------------------------
-# Abstraction (implemented by real bpy wrappers and by test mocks)
+# Abstraction (bpy implementation in blender_tests/tests.py)
 # ---------------------------------------------------------------------------
 
 class ExportBlenderContext(ABC):
-    """Wraps bpy export operators so they can be replaced by test mocks."""
+    """Wraps bpy export operators."""
 
     @abstractmethod
     def export_gltf(self, filepath: str, embed_textures: bool) -> None:
@@ -163,7 +163,7 @@ def run_export(
     manifest_path = asset_out_dir / f"{asset_id}_qa.json"
 
     # ------------------------------------------------------------------
-    # Export scene via abstraction (bpy or mock)
+    # Export scene
     # ------------------------------------------------------------------
     if config.format == "gltf":
         context.export_gltf(str(export_path), config.embed_textures)

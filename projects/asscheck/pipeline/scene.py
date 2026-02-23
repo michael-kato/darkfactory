@@ -4,10 +4,6 @@ Validates scene-level conventions: object naming, orphan data, LOD and
 collision mesh presence.  Computes performance estimates (draw calls, VRAM,
 bone/skinning cost) and returns them alongside the stage result.
 
-The ``SceneBlenderContext`` / ``SceneMeshObject`` / ``SceneArmatureObject`` /
-``SceneImage`` ABCs allow pure-Python unit testing via mock implementations
-that never import bpy.
-
 ``check_scene`` returns a ``tuple[StageResult, PerformanceEstimates]``.  The
 caller should pass the ``PerformanceEstimates`` to
 ``ReportBuilder.set_performance()``.
@@ -61,7 +57,7 @@ class SceneConfig:
 
 
 # ---------------------------------------------------------------------------
-# Abstractions (implemented by real bpy wrappers and by test mocks)
+# Abstractions (bpy implementations in blender_tests/tests.py)
 # ---------------------------------------------------------------------------
 
 class SceneMeshObject(ABC):
@@ -114,7 +110,7 @@ class SceneImage(ABC):
 
 
 class SceneBlenderContext(ABC):
-    """Access to scene data (real bpy scene or test mock)."""
+    """Access to scene data in the Blender scene."""
 
     @abstractmethod
     def mesh_objects(self) -> list[SceneMeshObject]: ...

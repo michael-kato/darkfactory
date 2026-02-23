@@ -4,8 +4,6 @@ Analyses UV layouts for all mesh objects in the Blender scene: detects missing
 UVs, out-of-bounds islands, overlapping islands, texel density violations, and
 lightmap UV2 issues.
 
-The UVMeshObject / UVBlenderContext ABCs allow pure-Python unit testing via
-mock implementations that never import bpy.
 """
 from __future__ import annotations
 
@@ -45,7 +43,7 @@ class UVConfig:
 
 
 # ---------------------------------------------------------------------------
-# Abstractions (implemented by real bpy wrappers and by test mocks)
+# Abstractions (bpy implementations in blender_tests/tests.py)
 # ---------------------------------------------------------------------------
 
 _Tri = tuple[tuple[float, float], tuple[float, float], tuple[float, float]]

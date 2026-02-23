@@ -4,9 +4,6 @@ Applies four deterministic auto-fix actions based on Stage 1 check results.
 Every change is logged as a ``FixEntry`` with before/after values.  Issues
 that cannot be safely auto-fixed are promoted to ``ReviewFlag`` entries.
 
-The ``RemediationMeshObject`` / ``RemediationImage`` / ``RemediationSkinnedMesh``
-/ ``RemediationBlenderContext`` ABCs allow pure-Python unit testing via mock
-implementations that never import bpy.
 """
 from __future__ import annotations
 
@@ -51,7 +48,7 @@ class RemediationConfig:
 
 
 # ---------------------------------------------------------------------------
-# Abstractions (implemented by real bpy wrappers and by test mocks)
+# Abstractions (bpy implementations in blender_tests/tests.py)
 # ---------------------------------------------------------------------------
 
 class RemediationMeshObject(ABC):
@@ -113,7 +110,7 @@ class RemediationSkinnedMesh(ABC):
 
 
 class RemediationBlenderContext(ABC):
-    """Access to the Blender scene for remediation (real bpy or test mock)."""
+    """Access to the Blender scene for remediation."""
 
     @abstractmethod
     def mesh_objects(self) -> list[RemediationMeshObject]: ...

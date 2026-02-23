@@ -7,9 +7,6 @@ Non-character assets without armatures skip this check cleanly via an early
 exit.  Character (or other category-requiring) assets that are missing an
 armature receive a FAIL on the ``armature_present`` check instead.
 
-The ArmatureBone / ArmatureObject / SkinnedMesh / ArmatureBlenderContext ABCs
-allow pure-Python unit testing via mock implementations that never import bpy.
-
 ``per_vertex_weights()`` contract
 ----------------------------------
 ``per_vertex_weights()[i]`` returns the list of *non-zero* weight values for
@@ -58,7 +55,7 @@ class ArmatureConfig:
 
 
 # ---------------------------------------------------------------------------
-# Abstractions (implemented by real bpy wrappers and by test mocks)
+# Abstractions (bpy implementations in blender_tests/tests.py)
 # ---------------------------------------------------------------------------
 
 class ArmatureBone(ABC):
@@ -103,7 +100,7 @@ class SkinnedMesh(ABC):
 
 
 class ArmatureBlenderContext(ABC):
-    """Access to armature and skinned-mesh data (real bpy scene or test mock)."""
+    """Access to armature and skinned-mesh data in the Blender scene."""
 
     @abstractmethod
     def armature_objects(self) -> list[ArmatureObject]: ...

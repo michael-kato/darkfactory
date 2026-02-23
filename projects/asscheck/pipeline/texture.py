@@ -4,8 +4,6 @@ Validates all textures referenced by materials in the Blender scene:
 resolution limits, power-of-two dimensions, missing references, texture
 count per material, channel count/bit depth, and color space assignment.
 
-The TextureMaterial / TextureImage / TextureBlenderContext ABCs allow
-pure-Python unit testing via mock implementations that never import bpy.
 """
 from __future__ import annotations
 
@@ -68,7 +66,7 @@ class ImageTextureNode:
 
 
 # ---------------------------------------------------------------------------
-# Abstractions (implemented by real bpy wrappers and by test mocks)
+# Abstractions (bpy implementations in blender_tests/tests.py)
 # ---------------------------------------------------------------------------
 
 class TextureMaterial(ABC):

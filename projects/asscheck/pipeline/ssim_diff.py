@@ -3,9 +3,6 @@
 Compares new turntable renders against golden reference images using
 structural similarity (SSIM). Flagged renders are marked for human review.
 
-The ``_compute_ssim`` parameter on ``compare_renders`` is injectable for
-unit testing — pass a callable ``(path1, path2) -> (float, array|None)``
-to avoid the scikit-image/Pillow dependency in tests.
 """
 from __future__ import annotations
 
@@ -99,7 +96,7 @@ def compare_renders(
         Directory containing golden reference images with the same filenames.
     _compute_ssim:
         Optional callable ``(path1, path2) -> (float, array|None)``.
-        Defaults to :func:`_default_ssim_fn`.  Inject a mock for unit tests.
+        Defaults to :func:`_default_ssim_fn`.
 
     Returns
     -------

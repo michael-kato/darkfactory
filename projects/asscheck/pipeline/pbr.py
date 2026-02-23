@@ -4,9 +4,6 @@ Validates PBR material compliance: workflow type, albedo/metalness/roughness
 value ranges, normal map validity, material slot count, and Principled BSDF
 node graph structure.
 
-The PBRMaterial / PBRMeshObject / PBRBlenderContext ABCs allow pure-Python
-unit testing via mock implementations that never import bpy.
-
 Pixel data conventions:
 - albedo_pixels():   flat RGBA floats in sRGB [0, 1]  (Pillow-normalised or
                      bpy linear converted to sRGB before return)
@@ -75,7 +72,7 @@ class NormalMapData:
 
 
 # ---------------------------------------------------------------------------
-# Abstractions (implemented by real bpy wrappers and by test mocks)
+# Abstractions (bpy implementations in blender_tests/tests.py)
 # ---------------------------------------------------------------------------
 
 class PBRMaterial(ABC):

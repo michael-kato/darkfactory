@@ -3,9 +3,6 @@
 Analyses mesh geometry using bmesh to detect polycount violations,
 non-manifold conditions, degenerate faces, normal inconsistencies,
 loose geometry, and interior faces.
-
-The BlenderContext / MeshObject ABCs allow pure-Python unit testing via
-mock implementations that never import bpy.
 """
 from __future__ import annotations
 
@@ -51,7 +48,7 @@ class GeometryConfig:
 
 
 # ---------------------------------------------------------------------------
-# Abstractions (implemented by real bpy wrappers and by test mocks)
+# Abstractions (bpy implementations in blender_tests/tests.py)
 # ---------------------------------------------------------------------------
 
 class MeshObject(ABC):
@@ -68,7 +65,7 @@ class MeshObject(ABC):
 
     @abstractmethod
     def bmesh_get(self) -> Any:
-        """Return a bmesh-compatible object (``bmesh.types.BMesh`` or mock).
+        """Return a ``bmesh.types.BMesh`` for this object.
 
         The caller must not free/release the returned object; the concrete
         implementation manages its lifetime.
@@ -77,7 +74,7 @@ class MeshObject(ABC):
 
 
 class BlenderContext(ABC):
-    """Access to the loaded scene (real bpy scene or test mock)."""
+    """Access to the loaded Blender scene."""
 
     @abstractmethod
     def mesh_objects(self) -> list[MeshObject]: ...
@@ -152,9 +149,7 @@ def _check_normal_consistency(all_bm: list) -> CheckResult:
     that edge in *opposite* directions.  If both faces traverse the edge
     starting from the same vertex, one of them has a flipped normal.
 
-    Uses only ``edge.link_faces``, ``face.loops``, ``loop.edge`` and
-    ``loop.vert`` — all available on both ``bmesh.types.BMesh`` and the
-    test mock objects.
+    Uses ``edge.link_faces``, ``face.loops``, ``loop.edge`` and ``loop.vert``.
     """
     inconsistent: set[int] = set()
     for bm in all_bm:
