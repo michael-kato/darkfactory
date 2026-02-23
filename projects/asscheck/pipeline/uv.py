@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
 
 from pipeline.schema import CheckResult, CheckStatus, StageResult, StageStatus
 
@@ -46,28 +45,25 @@ class UVConfig:
 # Abstractions (bpy implementations in blender_tests/tests.py)
 # ---------------------------------------------------------------------------
 
-_Tri = tuple[tuple[float, float], tuple[float, float], tuple[float, float]]
-
-
 class UVMeshObject(ABC):
     """A single mesh object with UV channel access."""
 
     @property
     @abstractmethod
-    def name(self) -> str: ...
+    def name(self): ...
 
     @abstractmethod
-    def uv_layer_names(self) -> list[str]:
+    def uv_layer_names(self):
         """Return all UV layer names present on this mesh."""
         ...
 
     @abstractmethod
-    def uv_loops(self, layer_name: str) -> list[tuple[float, float]]:
+    def uv_loops(self, layer_name):
         """Return all (u, v) loop coordinates for the named UV layer."""
         ...
 
     @abstractmethod
-    def uv_triangles(self, layer_name: str) -> list[_Tri]:
+    def uv_triangles(self, layer_name):
         """Return UV triangles for the named layer as ((u0,v0),(u1,v1),(u2,v2)).
 
         Used for overlap detection and texel-density computation.
@@ -75,7 +71,7 @@ class UVMeshObject(ABC):
         ...
 
     @abstractmethod
-    def world_surface_area(self) -> float:
+    def world_surface_area(self):
         """Return total surface area of this mesh in world-space m²."""
         ...
 
@@ -91,20 +87,11 @@ class UVBlenderContext(ABC):
 # 2-D geometry helpers
 # ---------------------------------------------------------------------------
 
-def _cross_2d(
-    o: tuple[float, float],
-    a: tuple[float, float],
-    b: tuple[float, float],
-) -> float:
+def _cross_2d(o, a, b):
     return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
 
 
-def _segments_intersect(
-    a0: tuple[float, float],
-    a1: tuple[float, float],
-    b0: tuple[float, float],
-    b1: tuple[float, float],
-) -> bool:
+def _segments_intersect(a0, a1, b0, b1):
     """Return True if segments a0-a1 and b0-b1 properly intersect."""
     d1 = _cross_2d(b0, b1, a0)
     d2 = _cross_2d(b0, b1, a1)
@@ -116,12 +103,7 @@ def _segments_intersect(
     )
 
 
-def _point_in_triangle(
-    p: tuple[float, float],
-    t0: tuple[float, float],
-    t1: tuple[float, float],
-    t2: tuple[float, float],
-) -> bool:
+def _point_in_triangle(p, t0, t1, t2):
     """Return True if point p lies inside (or on the boundary of) triangle t0-t1-t2."""
     d0 = _cross_2d(t0, t1, p)
     d1 = _cross_2d(t1, t2, p)
@@ -131,7 +113,7 @@ def _point_in_triangle(
     return not (has_neg and has_pos)
 
 
-def _triangles_overlap(t1: _Tri, t2: _Tri) -> bool:
+def _triangles_overlap(t1, t2):
     """Exact 2-D triangle-triangle overlap test.
 
     Returns True if the triangles share any interior area (edge crossings or
@@ -157,13 +139,13 @@ def _triangles_overlap(t1: _Tri, t2: _Tri) -> bool:
     return False
 
 
-def _triangle_aabb(tri: _Tri) -> tuple[float, float, float, float]:
+def _triangle_aabb(tri):
     xs = (tri[0][0], tri[1][0], tri[2][0])
     ys = (tri[0][1], tri[1][1], tri[2][1])
     return min(xs), min(ys), max(xs), max(ys)
 
 
-def _triangle_area_2d(tri: _Tri) -> float:
+def _triangle_area_2d(tri):
     (x0, y0), (x1, y1), (x2, y2) = tri
     return abs((x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0)) / 2.0
 
@@ -171,13 +153,13 @@ def _triangle_area_2d(tri: _Tri) -> float:
 _GRID = 16  # spatial-hash grid resolution
 
 
-def _find_overlapping_pairs(triangles: list[_Tri]) -> int:
+def _find_overlapping_pairs(triangles):
     """Return the count of overlapping triangle pairs using spatial hashing."""
     if len(triangles) < 2:
         return 0
 
     # Build spatial hash: grid cell → list of triangle indices.
-    grid: dict[tuple[int, int], list[int]] = {}
+    grid = {}
     for idx, tri in enumerate(triangles):
         x0, y0, x1, y1 = _triangle_aabb(tri)
         cx0 = int(x0 * _GRID)
@@ -189,7 +171,7 @@ def _find_overlapping_pairs(triangles: list[_Tri]) -> int:
                 grid.setdefault((cx, cy), []).append(idx)
 
     # Check all candidate pairs exactly once.
-    checked: set[tuple[int, int]] = set()
+    checked = set()
     overlap_count = 0
     for cell_indices in grid.values():
         n = len(cell_indices)
@@ -254,7 +236,7 @@ def _check_uv_overlap(
     objects: list[UVMeshObject],
     config: UVConfig,
 ) -> CheckResult:
-    all_tris: list[_Tri] = []
+    all_tris = []
     for obj in objects:
         if config.uv_layer_name in obj.uv_layer_names():
             all_tris.extend(obj.uv_triangles(config.uv_layer_name))
@@ -277,7 +259,7 @@ def _check_texel_density(
     config: UVConfig,
 ) -> CheckResult:
     min_target, max_target = config.texel_density_target_px_per_m
-    densities: list[float] = []
+    densities = []
 
     for obj in objects:
         if config.uv_layer_name not in obj.uv_layer_names():
@@ -304,7 +286,7 @@ def _check_texel_density(
         1 for d in densities if d < min_target or d > max_target
     )
 
-    measured: dict[str, Any] = {
+    measured = {
         "min": d_min,
         "max": d_max,
         "mean": d_mean,
@@ -353,7 +335,7 @@ def _check_lightmap_uv2(
             ),
         )
 
-    all_tris: list[_Tri] = []
+    all_tris = []
     for obj in objects:
         all_tris.extend(obj.uv_triangles(config.lightmap_layer_name))
 

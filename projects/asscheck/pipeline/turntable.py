@@ -59,7 +59,7 @@ class TurntableConfig:
 # Blender helpers (all imports of bpy are deferred to inside the functions)
 # ---------------------------------------------------------------------------
 
-def _import_asset(path: str) -> None:
+def _import_asset(path):
     """Load the asset file into the current Blender scene."""
     import bpy  # noqa: PLC0415
 
@@ -113,7 +113,7 @@ def _get_scene_bounds():
     return centre, max(radius, 0.01)
 
 
-def _setup_camera(x: float, y: float, z: float, target) -> None:
+def _setup_camera(x, y, z, target):
     """Position the scene camera at (x, y, z) pointing towards *target*."""
     import bpy  # noqa: PLC0415
     import mathutils
@@ -137,7 +137,7 @@ def _setup_camera(x: float, y: float, z: float, target) -> None:
     bpy.context.scene.camera = cam_obj
 
 
-def _setup_lighting() -> None:
+def _setup_lighting():
     """Set up a 3-point lighting rig.
 
     Attempts to configure an HDRI-based world material first; falls back to
@@ -151,7 +151,7 @@ def _setup_lighting() -> None:
         _setup_three_point_lighting(bpy)
 
 
-def _setup_world_lighting(bpy) -> None:  # noqa: ANN001
+def _setup_world_lighting(bpy):
     """Configure the world background as a uniform bright environment."""
     world = bpy.data.worlds.get("QAWorld") or bpy.data.worlds.new("QAWorld")
     world.use_nodes = True
@@ -167,7 +167,7 @@ def _setup_world_lighting(bpy) -> None:  # noqa: ANN001
     bpy.context.scene.world = world
 
 
-def _setup_three_point_lighting(bpy) -> None:  # noqa: ANN001
+def _setup_three_point_lighting(bpy):
     """Add sun + fill + back point lights."""
     specs = [
         ("QASun",  3.0, (0.785,  0.0,   0.785)),
@@ -183,7 +183,7 @@ def _setup_three_point_lighting(bpy) -> None:  # noqa: ANN001
             lo.rotation_euler = rot
 
 
-def _setup_render_settings(config: TurntableConfig) -> None:
+def _setup_render_settings(config: TurntableConfig):
     """Apply resolution, engine, and sample count to the active scene."""
     import bpy  # noqa: PLC0415
 
@@ -213,8 +213,8 @@ def _setup_render_settings(config: TurntableConfig) -> None:
 # ---------------------------------------------------------------------------
 
 def render_turntable(
-    asset_blend_or_gltf: str,
-    output_dir: str,
+    asset_blend_or_gltf,
+    output_dir,
     config: TurntableConfig | None = None,
 ) -> list[str]:
     """Render turntable views of an asset from Blender.
@@ -253,7 +253,7 @@ def render_turntable(
     elev_rad = math.radians(config.camera_elevation)
     dist = config.camera_distance + radius
 
-    rendered: list[str] = []
+    rendered = []
     for i in range(config.num_angles):
         angle_deg = i * angle_step
         az_rad = math.radians(angle_deg)

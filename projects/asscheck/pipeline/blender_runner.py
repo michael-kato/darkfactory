@@ -9,10 +9,9 @@ from __future__ import annotations
 
 import json
 import subprocess
-from typing import Any
 
 
-def run_in_blender(script: str, args: list[str] | None = None) -> dict[str, Any]:
+def run_in_blender(script, args=None):
     """Run *script* inside Blender headless and return parsed JSON output.
 
     The script must print a single JSON object to stdout (typically as the

@@ -92,7 +92,7 @@ from pipeline.turntable import TurntableConfig, render_turntable  # noqa: E402
 # Shared utility
 # ---------------------------------------------------------------------------
 
-def _clear_scene() -> None:
+def _clear_scene():
     bpy.ops.object.select_all(action="SELECT")
     bpy.ops.object.delete(use_global=False)
     for block in list(bpy.data.meshes):
@@ -108,14 +108,14 @@ def _clear_scene() -> None:
 # ===========================================================================
 
 class BpyGeomMeshObject(MeshObject):
-    def __init__(self, obj: bpy.types.Object) -> None:
+    def __init__(self, obj):
         self._obj = obj
 
     @property
-    def name(self) -> str:
+    def name(self):
         return self._obj.name
 
-    def triangle_count(self) -> int:
+    def triangle_count(self):
         return sum(len(p.vertices) - 2 for p in self._obj.data.polygons)
 
     def bmesh_get(self):
@@ -148,12 +148,12 @@ _GEOM_KNOWN_BAD = [
 ]
 
 
-def run_geometry_tests() -> dict:
+def run_geometry_tests():
     """Run stage 1a geometry tests. Returns dict with 'passed' key."""
     if not ASSETS_DIR.exists():
         return {"skipped": True, "reason": f"assets dir not found: {ASSETS_DIR}"}
 
-    failures: list[str] = []
+    failures = []
     tests_run = 0
 
     # Smoke test: real asset
@@ -208,12 +208,12 @@ def run_geometry_tests() -> dict:
 # ===========================================================================
 
 class BpyUVMeshObject(UVMeshObject):
-    def __init__(self, obj: bpy.types.Object) -> None:
+    def __init__(self, obj):
         self._obj = obj
         self._bm = None
 
     @property
-    def name(self) -> str:
+    def name(self):
         return self._obj.name
 
     def _ensure_bm(self):
@@ -223,17 +223,17 @@ class BpyUVMeshObject(UVMeshObject):
             _bmesh.ops.triangulate(self._bm, faces=self._bm.faces[:])
         return self._bm
 
-    def uv_layer_names(self) -> list[str]:
+    def uv_layer_names(self):
         return [layer.name for layer in self._obj.data.uv_layers]
 
-    def uv_loops(self, layer_name: str) -> list[tuple[float, float]]:
+    def uv_loops(self, layer_name):
         mesh = self._obj.data
         layer = mesh.uv_layers.get(layer_name)
         if layer is None:
             return []
         return [(ld.uv[0], ld.uv[1]) for ld in layer.data]
 
-    def uv_triangles(self, layer_name: str) -> list[tuple]:
+    def uv_triangles(self, layer_name):
         bm = self._ensure_bm()
         uv_layer = bm.loops.layers.uv.get(layer_name)
         if uv_layer is None:
@@ -248,7 +248,7 @@ class BpyUVMeshObject(UVMeshObject):
                 result.append(coords)
         return result
 
-    def world_surface_area(self) -> float:
+    def world_surface_area(self):
         bm = self._ensure_bm()
         matrix = self._obj.matrix_world
         total = 0.0
@@ -259,7 +259,7 @@ class BpyUVMeshObject(UVMeshObject):
                 total += (b - a).cross(c - a).length / 2.0
         return total
 
-    def __del__(self) -> None:
+    def __del__(self):
         if self._bm is not None:
             self._bm.free()
             self._bm = None
@@ -285,12 +285,12 @@ _UV_KNOWN_BAD = [
 ]
 
 
-def run_uv_tests() -> dict:
+def run_uv_tests():
     """Run stage 1b UV tests. Returns dict with 'passed' key."""
     if not ASSETS_DIR.exists():
         return {"skipped": True, "reason": f"assets dir not found: {ASSETS_DIR}"}
 
-    failures: list[str] = []
+    failures = []
     tests_run = 0
 
     # Smoke test: real asset
@@ -342,7 +342,7 @@ def run_uv_tests() -> dict:
 # Stage 1c — Texture
 # ===========================================================================
 
-def _tex_get_socket_name(node: bpy.types.Node) -> str:
+def _tex_get_socket_name(node):
     try:
         links = node.outputs["Color"].links
         if links:
@@ -352,7 +352,7 @@ def _tex_get_socket_name(node: bpy.types.Node) -> str:
     return node.image.name if node.image else ""
 
 
-def _tex_filepath_is_missing(image: bpy.types.Image) -> bool:
+def _tex_filepath_is_missing(image):
     import os
     if not image.filepath:
         return False
@@ -363,11 +363,11 @@ def _tex_filepath_is_missing(image: bpy.types.Image) -> bool:
 
 
 class BpyTexMaterial(TextureMaterial):
-    def __init__(self, mat: bpy.types.Material) -> None:
+    def __init__(self, mat):
         self._mat = mat
 
     @property
-    def name(self) -> str:
+    def name(self):
         return self._mat.name
 
     def image_texture_nodes(self) -> list[ImageTextureNode]:
@@ -388,23 +388,23 @@ class BpyTexMaterial(TextureMaterial):
 
 
 class BpyTexImage(TextureImage):
-    def __init__(self, image: bpy.types.Image) -> None:
+    def __init__(self, image):
         self._image = image
 
     @property
-    def name(self) -> str:
+    def name(self):
         return self._image.name
 
     @property
-    def size(self) -> tuple[int, int]:
+    def size(self):
         return (self._image.size[0], self._image.size[1])
 
     @property
-    def depth(self) -> int:
+    def depth(self):
         return self._image.depth
 
     @property
-    def colorspace_name(self) -> str:
+    def colorspace_name(self):
         return self._image.colorspace_settings.name
 
 
@@ -420,7 +420,7 @@ class BpyTexContext(TextureBlenderContext):
         return [BpyTexImage(img) for img in bpy.data.images]
 
 
-def _create_wrong_colorspace_scene() -> None:
+def _create_wrong_colorspace_scene():
     """Create a minimal scene: one mesh with a normal map image set to sRGB (wrong)."""
     _clear_scene()
     mesh = bpy.data.meshes.new("test_mesh")
@@ -451,12 +451,12 @@ _TEX_EXPECTED_CHECKS = {
 }
 
 
-def run_texture_tests() -> dict:
+def run_texture_tests():
     """Run stage 1c texture tests. Returns dict with 'passed' key."""
     if not ASSETS_DIR.exists():
         return {"skipped": True, "reason": f"assets dir not found: {ASSETS_DIR}"}
 
-    failures: list[str] = []
+    failures = []
     tests_run = 0
 
     # Smoke test: real asset
@@ -501,19 +501,19 @@ def run_texture_tests() -> dict:
 # Stage 1d — PBR
 # ===========================================================================
 
-def _linear_to_srgb(v: float) -> float:
+def _linear_to_srgb(v):
     v = max(0.0, min(1.0, v))
     if v <= 0.0031308:
         return v * 12.92
     return 1.055 * (v ** (1.0 / 2.4)) - 0.055
 
 
-def _get_image_pixels_srgb(image: bpy.types.Image) -> list[float] | None:
+def _get_image_pixels_srgb(image):
     try:
         if not image.has_data:
             return None
         linear = list(image.pixels)
-        out: list[float] = []
+        out = []
         for i in range(0, len(linear), 4):
             out.append(_linear_to_srgb(linear[i]))
             out.append(_linear_to_srgb(linear[i + 1]))
@@ -524,7 +524,7 @@ def _get_image_pixels_srgb(image: bpy.types.Image) -> list[float] | None:
         return None
 
 
-def _get_image_pixels_linear(image: bpy.types.Image) -> list[float] | None:
+def _get_image_pixels_linear(image):
     try:
         if not image.has_data:
             return None
@@ -533,7 +533,7 @@ def _get_image_pixels_linear(image: bpy.types.Image) -> list[float] | None:
         return None
 
 
-def _get_tex_image_for_socket(node_tree: bpy.types.NodeTree, socket_name: str):
+def _get_tex_image_for_socket(node_tree, socket_name):
     pbsdf = next(
         (n for n in node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None
     )
@@ -548,19 +548,19 @@ def _get_tex_image_for_socket(node_tree: bpy.types.NodeTree, socket_name: str):
     return None
 
 
-def _has_output_link(node: bpy.types.Node, node_tree: bpy.types.NodeTree) -> bool:
+def _has_output_link(node, node_tree):
     return any(link.from_node == node for link in node_tree.links)
 
 
-def _detect_cycles(node_tree: bpy.types.NodeTree) -> bool:
-    successors: dict[str, list[str]] = {n.name: [] for n in node_tree.nodes}
+def _detect_cycles(node_tree):
+    successors = {n.name: [] for n in node_tree.nodes}
     for link in node_tree.links:
         successors[link.from_node.name].append(link.to_node.name)
 
-    visited: set[str] = set()
-    rec_stack: set[str] = set()
+    visited = set()
+    rec_stack = set()
 
-    def dfs(name: str) -> bool:
+    def dfs(name):
         visited.add(name)
         rec_stack.add(name)
         for neighbor in successors.get(name, []):
@@ -580,34 +580,34 @@ def _detect_cycles(node_tree: bpy.types.NodeTree) -> bool:
 
 
 class BpyPBRMesh(PBRMeshObject):
-    def __init__(self, obj: bpy.types.Object) -> None:
+    def __init__(self, obj):
         self._obj = obj
 
     @property
-    def name(self) -> str:
+    def name(self):
         return self._obj.name
 
     @property
-    def material_slot_count(self) -> int:
+    def material_slot_count(self):
         return len(self._obj.material_slots)
 
 
 class BpyPBRMaterial(PBRMaterial):
-    def __init__(self, mat: bpy.types.Material) -> None:
+    def __init__(self, mat):
         self._mat = mat
 
     @property
-    def name(self) -> str:
+    def name(self):
         return self._mat.name
 
-    def has_nodes(self) -> bool:
+    def has_nodes(self):
         return (
             self._mat.use_nodes
             and self._mat.node_tree is not None
             and len(self._mat.node_tree.nodes) > 0
         )
 
-    def uses_principled_bsdf(self) -> bool:
+    def uses_principled_bsdf(self):
         if not self.has_nodes():
             return False
         tree = self._mat.node_tree
@@ -620,7 +620,7 @@ class BpyPBRMaterial(PBRMaterial):
                     return True
         return False
 
-    def uses_spec_gloss(self) -> bool:
+    def uses_spec_gloss(self):
         if not self.has_nodes():
             return False
         tree = self._mat.node_tree
@@ -632,7 +632,7 @@ class BpyPBRMaterial(PBRMaterial):
                     return True
         return False
 
-    def orphan_image_node_count(self) -> int:
+    def orphan_image_node_count(self):
         if not self.has_nodes():
             return 0
         tree = self._mat.node_tree
@@ -641,12 +641,12 @@ class BpyPBRMaterial(PBRMaterial):
             if node.type == "TEX_IMAGE" and not _has_output_link(node, tree)
         )
 
-    def has_node_cycles(self) -> bool:
+    def has_node_cycles(self):
         if not self.has_nodes():
             return False
         return _detect_cycles(self._mat.node_tree)
 
-    def albedo_pixels(self) -> list[float] | None:
+    def albedo_pixels(self):
         if not self.has_nodes():
             return None
         image = _get_tex_image_for_socket(self._mat.node_tree, "Base Color")
@@ -654,7 +654,7 @@ class BpyPBRMaterial(PBRMaterial):
             return None
         return _get_image_pixels_srgb(image)
 
-    def metalness_pixels(self) -> list[float] | None:
+    def metalness_pixels(self):
         if not self.has_nodes():
             return None
         image = _get_tex_image_for_socket(self._mat.node_tree, "Metallic")
@@ -662,7 +662,7 @@ class BpyPBRMaterial(PBRMaterial):
             return None
         return _get_image_pixels_linear(image)
 
-    def roughness_pixels(self) -> list[float] | None:
+    def roughness_pixels(self):
         if not self.has_nodes():
             return None
         image = _get_tex_image_for_socket(self._mat.node_tree, "Roughness")
@@ -709,7 +709,7 @@ class BpyPBRContext(PBRBlenderContext):
         ]
 
 
-def _create_emission_scene() -> None:
+def _create_emission_scene():
     """Create a minimal scene: mesh with Emission shader (non-PBR)."""
     _clear_scene()
     mesh = bpy.data.meshes.new("test_mesh")
@@ -735,12 +735,12 @@ _PBR_EXPECTED_CHECKS = {
 }
 
 
-def run_pbr_tests() -> dict:
+def run_pbr_tests():
     """Run stage 1d PBR tests. Returns dict with 'passed' key."""
     if not ASSETS_DIR.exists():
         return {"skipped": True, "reason": f"assets dir not found: {ASSETS_DIR}"}
 
-    failures: list[str] = []
+    failures = []
     tests_run = 0
 
     # Smoke test: real asset
@@ -786,11 +786,11 @@ def run_pbr_tests() -> dict:
 # ===========================================================================
 
 class BpyArmBone(ArmatureBone):
-    def __init__(self, bone: bpy.types.Bone) -> None:
+    def __init__(self, bone):
         self._bone = bone
 
     @property
-    def name(self) -> str:
+    def name(self):
         return self._bone.name
 
     @property
@@ -801,11 +801,11 @@ class BpyArmBone(ArmatureBone):
 
 
 class BpyArmObject(ArmatureObject):
-    def __init__(self, obj: bpy.types.Object) -> None:
+    def __init__(self, obj):
         self._obj = obj
 
     @property
-    def name(self) -> str:
+    def name(self):
         return self._obj.name
 
     def bones(self) -> list[BpyArmBone]:
@@ -813,16 +813,16 @@ class BpyArmObject(ArmatureObject):
 
 
 class BpySkinned(SkinnedMesh):
-    def __init__(self, obj: bpy.types.Object) -> None:
+    def __init__(self, obj):
         self._obj = obj
 
     @property
-    def name(self) -> str:
+    def name(self):
         return self._obj.name
 
-    def per_vertex_weights(self) -> list[list[float]]:
+    def per_vertex_weights(self):
         mesh = self._obj.data
-        result: list[list[float]] = []
+        result = []
         for vert in mesh.vertices:
             weights = [g.weight for g in vert.groups if g.weight > 0.0]
             result.append(weights)
@@ -845,12 +845,12 @@ class BpyArmContext(ArmatureBlenderContext):
         ]
 
 
-def run_armature_tests() -> dict:
+def run_armature_tests():
     """Run stage 1e armature tests. Returns dict with 'passed' key."""
     if not ASSETS_DIR.exists():
         return {"skipped": True, "reason": f"assets dir not found: {ASSETS_DIR}"}
 
-    failures: list[str] = []
+    failures = []
     tests_run = 0
 
     # Test: env_prop with no armature → should be SKIPPED
@@ -887,51 +887,51 @@ def run_armature_tests() -> dict:
 # ===========================================================================
 
 class BpySceneMesh(SceneMeshObject):
-    def __init__(self, obj: bpy.types.Object) -> None:
+    def __init__(self, obj):
         self._obj = obj
 
     @property
-    def name(self) -> str:
+    def name(self):
         return self._obj.name
 
-    def triangle_count(self) -> int:
+    def triangle_count(self):
         mesh = self._obj.data
         return sum(len(p.vertices) - 2 for p in mesh.polygons if len(p.vertices) >= 3)
 
-    def material_slot_count(self) -> int:
+    def material_slot_count(self):
         return max(1, len(self._obj.material_slots))
 
 
 class BpySceneArm(SceneArmatureObject):
-    def __init__(self, obj: bpy.types.Object) -> None:
+    def __init__(self, obj):
         self._obj = obj
 
     @property
-    def name(self) -> str:
+    def name(self):
         return self._obj.name
 
-    def bone_count(self) -> int:
+    def bone_count(self):
         return len(self._obj.data.bones)
 
 
 class BpySceneImage(SceneImage):
-    def __init__(self, image: bpy.types.Image) -> None:
+    def __init__(self, image):
         self._image = image
 
     @property
-    def width(self) -> int:
+    def width(self):
         return self._image.size[0]
 
     @property
-    def height(self) -> int:
+    def height(self):
         return self._image.size[1]
 
     @property
-    def channels(self) -> int:
+    def channels(self):
         return self._image.channels
 
     @property
-    def bit_depth(self) -> int:
+    def bit_depth(self):
         if self._image.channels > 0:
             return self._image.depth // self._image.channels
         return 8
@@ -959,7 +959,7 @@ class BpySceneCtx(SceneBlenderContext):
             if img.users > 0 and img.size[0] > 0 and img.size[1] > 0
         ]
 
-    def orphan_counts(self) -> dict[str, int]:
+    def orphan_counts(self):
         return {
             "meshes": sum(1 for m in bpy.data.meshes if m.users == 0),
             "materials": sum(1 for m in bpy.data.materials if m.users == 0),
@@ -967,12 +967,12 @@ class BpySceneCtx(SceneBlenderContext):
         }
 
 
-def run_scene_tests() -> dict:
+def run_scene_tests():
     """Run stage 1f scene tests. Returns dict with 'passed' key."""
     if not ASSETS_DIR.exists():
         return {"skipped": True, "reason": f"assets dir not found: {ASSETS_DIR}"}
 
-    failures: list[str] = []
+    failures = []
     tests_run = 0
 
     asset = ASSETS_DIR / "street_lamp_01.gltf"
@@ -1026,17 +1026,17 @@ def run_scene_tests() -> dict:
 # ===========================================================================
 
 class BpyRemMesh(RemediationMeshObject):
-    def __init__(self, obj: bpy.types.Object) -> None:
+    def __init__(self, obj):
         self._obj = obj
 
     @property
-    def name(self) -> str:
+    def name(self):
         return self._obj.name
 
-    def vertex_count(self) -> int:
+    def vertex_count(self):
         return len(self._obj.data.vertices)
 
-    def recalculate_normals(self) -> None:
+    def recalculate_normals(self):
         bpy.context.view_layer.objects.active = self._obj
         self._obj.select_set(True)
         bpy.ops.object.mode_set(mode="EDIT")
@@ -1044,7 +1044,7 @@ class BpyRemMesh(RemediationMeshObject):
         bpy.ops.mesh.normals_make_consistent(inside=False)
         bpy.ops.object.mode_set(mode="OBJECT")
 
-    def merge_by_distance(self, threshold: float) -> int:
+    def merge_by_distance(self, threshold):
         bpy.context.view_layer.objects.active = self._obj
         self._obj.select_set(True)
         bpy.ops.object.mode_set(mode="EDIT")
@@ -1055,30 +1055,30 @@ class BpyRemMesh(RemediationMeshObject):
 
 
 class BpyRemImage(RemediationImage):
-    def __init__(self, img: bpy.types.Image) -> None:
+    def __init__(self, img):
         self._img = img
 
     @property
-    def name(self) -> str:
+    def name(self):
         return self._img.name
 
     @property
-    def size(self) -> tuple[int, int]:
+    def size(self):
         return (self._img.size[0], self._img.size[1])
 
-    def scale(self, new_w: int, new_h: int) -> None:
+    def scale(self, new_w, new_h):
         self._img.scale(new_w, new_h)
 
 
 class BpyRemSkinned(RemediationSkinnedMesh):
-    def __init__(self, obj: bpy.types.Object) -> None:
+    def __init__(self, obj):
         self._obj = obj
 
     @property
-    def name(self) -> str:
+    def name(self):
         return self._obj.name
 
-    def max_influences(self) -> int:
+    def max_influences(self):
         mesh = self._obj.data
         max_inf = 0
         for vert in mesh.vertices:
@@ -1106,20 +1106,20 @@ class BpyRemContext(RemediationBlenderContext):
             if obj.type == "MESH" and obj.vertex_groups
         ]
 
-    def limit_bone_weights(self, limit: int) -> None:
+    def limit_bone_weights(self, limit):
         bpy.ops.object.vertex_group_limit_total(
             group_select_mode="ALL", limit=limit,
         )
         bpy.ops.object.vertex_group_normalize_all()
 
 
-def run_remediation_tests() -> dict:
+def run_remediation_tests():
     """Run stage 2 remediation tests. Returns dict with 'passed' key."""
     asset = ASSETS_DIR / "street_lamp_01.gltf"
     if not ASSETS_DIR.exists() or not asset.exists():
         return {"skipped": True, "reason": f"asset not found: {asset}"}
 
-    failures: list[str] = []
+    failures = []
 
     _clear_scene()
     bpy.ops.import_scene.gltf(filepath=str(asset))
@@ -1154,13 +1154,13 @@ def run_remediation_tests() -> dict:
 # Stage 5 — Turntable
 # ===========================================================================
 
-def run_stage5_tests() -> dict:
+def run_stage5_tests():
     """Run stage 5 turntable render tests. Returns dict with 'passed' key."""
     asset = ASSETS_DIR / "street_lamp_01.gltf"
     if not ASSETS_DIR.exists() or not asset.exists():
         return {"skipped": True, "reason": f"asset not found: {asset}"}
 
-    failures: list[str] = []
+    failures = []
 
     config = TurntableConfig(
         num_angles=4,
@@ -1200,9 +1200,9 @@ _ALL_TESTS = [
 ]
 
 
-def run_all() -> dict:
-    results: dict[str, dict] = {}
-    failed: list[str] = []
+def run_all():
+    results = {}
+    failed = []
 
     for name, fn in _ALL_TESTS:
         print(f"[tests] {name} ...", flush=True)
@@ -1226,7 +1226,7 @@ def run_all() -> dict:
     return {"passed": len(failed) == 0, "failed": failed, "results": results}
 
 
-def _main() -> None:
+def _main():
     r = run_all()
     summary = {"passed": r["passed"], "failed": r["failed"]}
     print(json.dumps(summary, indent=2))

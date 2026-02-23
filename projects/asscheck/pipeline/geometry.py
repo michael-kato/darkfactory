@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any
 
 from pipeline.schema import CheckResult, CheckStatus, StageResult, StageStatus
 
@@ -16,7 +15,7 @@ from pipeline.schema import CheckResult, CheckStatus, StageResult, StageStatus
 # Default triangle budgets per asset category
 # ---------------------------------------------------------------------------
 
-_DEFAULT_BUDGETS: dict[str, tuple[int, int]] = {
+_DEFAULT_BUDGETS = {
     "env_prop":  (500,   5_000),
     "hero_prop": (5_000, 15_000),
     "character": (15_000, 30_000),
@@ -56,15 +55,15 @@ class MeshObject(ABC):
 
     @property
     @abstractmethod
-    def name(self) -> str: ...
+    def name(self): ...
 
     @abstractmethod
-    def triangle_count(self) -> int:
+    def triangle_count(self):
         """Return the total number of triangles in this object."""
         ...
 
     @abstractmethod
-    def bmesh_get(self) -> Any:
+    def bmesh_get(self):
         """Return a ``bmesh.types.BMesh`` for this object.
 
         The caller must not free/release the returned object; the concrete
@@ -114,7 +113,7 @@ def _check_polycount(
     )
 
 
-def _check_non_manifold(all_bm: list) -> CheckResult:
+def _check_non_manifold(all_bm) -> CheckResult:
     count = sum(1 for bm in all_bm for e in bm.edges if not e.is_manifold)
     return CheckResult(
         name="non_manifold",
@@ -128,7 +127,7 @@ def _check_non_manifold(all_bm: list) -> CheckResult:
     )
 
 
-def _check_degenerate_faces(all_bm: list) -> CheckResult:
+def _check_degenerate_faces(all_bm) -> CheckResult:
     count = sum(1 for bm in all_bm for f in bm.faces if f.calc_area() < 1e-6)
     return CheckResult(
         name="degenerate_faces",
@@ -142,7 +141,7 @@ def _check_degenerate_faces(all_bm: list) -> CheckResult:
     )
 
 
-def _check_normal_consistency(all_bm: list) -> CheckResult:
+def _check_normal_consistency(all_bm) -> CheckResult:
     """Detect faces with inconsistent winding order relative to neighbours.
 
     Two faces that share an edge are *consistently* wound when they traverse
@@ -151,7 +150,7 @@ def _check_normal_consistency(all_bm: list) -> CheckResult:
 
     Uses ``edge.link_faces``, ``face.loops``, ``loop.edge`` and ``loop.vert``.
     """
-    inconsistent: set[int] = set()
+    inconsistent = set()
     for bm in all_bm:
         for edge in bm.edges:
             if len(edge.link_faces) != 2:
@@ -189,7 +188,7 @@ def _check_normal_consistency(all_bm: list) -> CheckResult:
     )
 
 
-def _check_loose_geometry(all_bm: list) -> CheckResult:
+def _check_loose_geometry(all_bm) -> CheckResult:
     """Count vertices with no linked faces and edges with no linked faces."""
     count = 0
     for bm in all_bm:
@@ -207,7 +206,7 @@ def _check_loose_geometry(all_bm: list) -> CheckResult:
     )
 
 
-def _check_interior_faces(all_bm: list) -> CheckResult:
+def _check_interior_faces(all_bm) -> CheckResult:
     """Heuristic: faces whose every edge is shared by more than 2 faces.
 
     When all of a face's edges have 3+ linked faces the face is likely

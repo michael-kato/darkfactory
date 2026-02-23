@@ -56,20 +56,20 @@ class RemediationMeshObject(ABC):
 
     @property
     @abstractmethod
-    def name(self) -> str: ...
+    def name(self): ...
 
     @abstractmethod
-    def vertex_count(self) -> int:
+    def vertex_count(self):
         """Return the current number of vertices."""
         ...
 
     @abstractmethod
-    def recalculate_normals(self) -> None:
+    def recalculate_normals(self):
         """Call bpy.ops.mesh.normals_make_consistent(inside=False) on this object."""
         ...
 
     @abstractmethod
-    def merge_by_distance(self, threshold: float) -> int:
+    def merge_by_distance(self, threshold):
         """Call bpy.ops.mesh.remove_doubles(threshold=threshold) on this object.
 
         Returns the vertex count *after* the merge.
@@ -82,16 +82,16 @@ class RemediationImage(ABC):
 
     @property
     @abstractmethod
-    def name(self) -> str: ...
+    def name(self): ...
 
     @property
     @abstractmethod
-    def size(self) -> tuple[int, int]:
+    def size(self):
         """Return (width, height) in pixels."""
         ...
 
     @abstractmethod
-    def scale(self, new_w: int, new_h: int) -> None:
+    def scale(self, new_w, new_h):
         """Call image.scale(new_w, new_h) to resize in-place."""
         ...
 
@@ -101,10 +101,10 @@ class RemediationSkinnedMesh(ABC):
 
     @property
     @abstractmethod
-    def name(self) -> str: ...
+    def name(self): ...
 
     @abstractmethod
-    def max_influences(self) -> int:
+    def max_influences(self):
         """Return the maximum number of non-zero weight influences on any vertex."""
         ...
 
@@ -122,7 +122,7 @@ class RemediationBlenderContext(ABC):
     def skinned_meshes(self) -> list[RemediationSkinnedMesh]: ...
 
     @abstractmethod
-    def limit_bone_weights(self, limit: int) -> None:
+    def limit_bone_weights(self, limit):
         """Call vertex_group_limit_total(limit=limit) then vertex_group_normalize_all()
         on all objects in the scene.
         """
@@ -135,8 +135,8 @@ class RemediationBlenderContext(ABC):
 
 def _find_check(
     stage1_results: list[StageResult],
-    stage_name: str,
-    check_name: str,
+    stage_name,
+    check_name,
 ):
     """Return the first CheckResult matching stage_name and check_name, or None."""
     for stage in stage1_results:
@@ -147,7 +147,7 @@ def _find_check(
     return None
 
 
-def _largest_pot(n: int) -> int:
+def _largest_pot(n):
     """Return the largest power-of-two that is ≤ n (minimum 1)."""
     if n <= 0:
         return 1
@@ -157,7 +157,7 @@ def _largest_pot(n: int) -> int:
     return pot
 
 
-def _compute_new_size(w: int, h: int, limit: int) -> tuple[int, int]:
+def _compute_new_size(w, h, limit):
     """Compute resized (width, height) preserving aspect ratio.
 
     The largest dimension is scaled to the largest PoT ≤ limit.  The other

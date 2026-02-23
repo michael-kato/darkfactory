@@ -63,7 +63,7 @@ class ArmatureBone(ABC):
 
     @property
     @abstractmethod
-    def name(self) -> str: ...
+    def name(self): ...
 
     @property
     @abstractmethod
@@ -77,7 +77,7 @@ class ArmatureObject(ABC):
 
     @property
     @abstractmethod
-    def name(self) -> str: ...
+    def name(self): ...
 
     @abstractmethod
     def bones(self) -> list[ArmatureBone]: ...
@@ -88,10 +88,10 @@ class SkinnedMesh(ABC):
 
     @property
     @abstractmethod
-    def name(self) -> str: ...
+    def name(self): ...
 
     @abstractmethod
-    def per_vertex_weights(self) -> list[list[float]]:
+    def per_vertex_weights(self):
         """Return one entry per vertex — a list of its *non-zero* weights.
 
         Vertices with no group assignment return an empty list ``[]``.
@@ -181,7 +181,7 @@ def _check_bone_naming(
         )
 
     pattern = re.compile(config.bone_naming_pattern)
-    violations: list[str] = []
+    violations = []
     for arm in armatures:
         for bone in arm.bones():
             if not pattern.match(bone.name):
@@ -221,7 +221,7 @@ def _check_vertex_weights(
                 if abs(total - 1.0) > 0.001:
                     unnormalized_count += 1
 
-    measured: dict = {
+    measured = {
         "zero_weight_count": zero_weight_count,
         "excess_influences_count": excess_influences_count,
         "unnormalized_count": unnormalized_count,
@@ -234,7 +234,7 @@ def _check_vertex_weights(
     )
 
     if has_violation:
-        parts: list[str] = []
+        parts = []
         if zero_weight_count:
             parts.append(f"{zero_weight_count} zero-weight vertex(ices)")
         if excess_influences_count:
@@ -276,7 +276,7 @@ def _check_bone_hierarchy(armatures: list[ArmatureObject]) -> CheckResult:
         if root_count > 1:
             total_orphan_count += root_count - 1
 
-    measured: dict = {
+    measured = {
         "root_count": total_root_count,
         "orphan_count": total_orphan_count,
     }

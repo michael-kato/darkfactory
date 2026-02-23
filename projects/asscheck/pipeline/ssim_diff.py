@@ -23,7 +23,7 @@ class SSIMResult:
 # Filename parsing helpers
 # ---------------------------------------------------------------------------
 
-def _parse_angle_from_path(path: str) -> int | None:
+def _parse_angle_from_path(path):
     """Extract the angle (int degrees) from a turntable filename.
 
     Expected pattern: ``{asset_id}_turntable_{angle:03d}.png``
@@ -36,7 +36,7 @@ def _parse_angle_from_path(path: str) -> int | None:
 # Default SSIM computation (requires scikit-image + Pillow)
 # ---------------------------------------------------------------------------
 
-def _default_ssim_fn(path1: str, path2: str):
+def _default_ssim_fn(path1, path2):
     """Compute SSIM between two images.  Returns (score, diff_array).
 
     Requires ``scikit-image`` and ``Pillow``.  Both images are converted to
@@ -58,7 +58,7 @@ def _default_ssim_fn(path1: str, path2: str):
     return float(score), diff
 
 
-def _save_diff_image(diff_arr, path: str) -> None:
+def _save_diff_image(diff_arr, path):
     """Save an SSIM diff array as a PNG highlighting changed pixels."""
     try:
         import numpy as np
@@ -81,8 +81,8 @@ SSIM_THRESHOLD = 0.85
 
 
 def compare_renders(
-    new_renders: list[str],
-    reference_dir: str,
+    new_renders,
+    reference_dir,
     *,
     _compute_ssim=None,
 ) -> list[SSIMResult]:
@@ -128,7 +128,7 @@ def compare_renders(
         score, diff_arr = compute(render_path, ref_path)
         flagged = score < SSIM_THRESHOLD
 
-        diff_path: str | None = None
+        diff_path = None
         if flagged and diff_arr is not None:
             diff_path = render_path[:-4] + "_diff.png"
             _save_diff_image(diff_arr, diff_path)

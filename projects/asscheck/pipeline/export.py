@@ -65,7 +65,7 @@ class ExportConfig:
 # Category → Unity folder mapping
 # ---------------------------------------------------------------------------
 
-CATEGORY_FOLDER: dict[str, str] = {
+CATEGORY_FOLDER = {
     "character": "Characters",
     "env_prop": "Environment/Props",
     "hero_prop": "Environment/Props",
@@ -83,7 +83,7 @@ class ExportBlenderContext(ABC):
     """Wraps bpy export operators."""
 
     @abstractmethod
-    def export_gltf(self, filepath: str, embed_textures: bool) -> None:
+    def export_gltf(self, filepath, embed_textures):
         """Export the active scene to *filepath* using the glTF exporter.
 
         Must apply all modifiers, use ``-Z`` forward / ``Y`` up, scale 1.0.
@@ -93,7 +93,7 @@ class ExportBlenderContext(ABC):
         ...
 
     @abstractmethod
-    def export_fbx(self, filepath: str) -> None:
+    def export_fbx(self, filepath):
         """Export the active scene to *filepath* using the FBX exporter.
 
         Must apply all modifiers, use ``-Z`` forward / ``Y`` up, scale 1.0,
@@ -108,12 +108,12 @@ class ExportBlenderContext(ABC):
 
 def _route(
     qa_report: QaReport,
-    export_path: Path,
-    manifest_path: Path,
+    export_path,
+    manifest_path,
     config: ExportConfig,
-    asset_id: str,
-    category: str,
-) -> None:
+    asset_id,
+    category,
+):
     """Copy the exported file and sidecar manifest to the routing directory."""
     status = qa_report.overall_status
 

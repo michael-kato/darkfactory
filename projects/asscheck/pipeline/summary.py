@@ -27,12 +27,12 @@ if TYPE_CHECKING:
 # HTML generation
 # ---------------------------------------------------------------------------
 
-def _img_tag(src: str, alt: str = "", style: str = "") -> str:
+def _img_tag(src, alt="", style=""):
     s = f' style="{escape(style)}"' if style else ""
     return f'<img src="{escape(src)}" alt="{escape(alt)}"{s}>'
 
 
-def _flag_row(flag: ReviewFlag) -> str:
+def _flag_row(flag: ReviewFlag):
     colour = {"ERROR": "#c0392b", "WARNING": "#e67e22", "INFO": "#2980b9"}
     bg = colour.get(flag.severity.value, "#555")
     badge = (
@@ -48,13 +48,13 @@ def _flag_row(flag: ReviewFlag) -> str:
 
 def _build_html(
     report: QaReport,
-    asset_id: str,
-    render_basenames: list[str],
-    scale_basename: str | None,
+    asset_id,
+    render_basenames,
+    scale_basename,
     ssim_results: list["SSIMResult"],
-    diff_basenames: list[str],
+    diff_basenames,
     all_flags: list[ReviewFlag],
-) -> str:
+):
     meta = report.metadata
     status = report.overall_status.value
 
@@ -177,11 +177,11 @@ def _build_html(
 
 def write_review_package(
     report: QaReport,
-    render_paths: list[str],
+    render_paths,
     ssim_results: "list[SSIMResult]",
-    scale_image: str,
-    output_dir: str,
-) -> None:
+    scale_image,
+    output_dir,
+):
     """Assemble a review package for human inspection.
 
     Copies all render images into ``{output_dir}/{asset_id}/`` and writes
@@ -210,7 +210,7 @@ def write_review_package(
     os.makedirs(package_dir, exist_ok=True)
 
     # --- Copy turntable renders ---
-    render_basenames: list[str] = []
+    render_basenames = []
     for render_path in render_paths:
         if os.path.exists(render_path):
             bn = os.path.basename(render_path)
@@ -218,7 +218,7 @@ def write_review_package(
             render_basenames.append(bn)
 
     # --- Copy SSIM diff images ---
-    diff_basenames: list[str] = []
+    diff_basenames = []
     for r in ssim_results:
         if r.diff_image_path and os.path.exists(r.diff_image_path):
             bn = os.path.basename(r.diff_image_path)
@@ -226,7 +226,7 @@ def write_review_package(
             diff_basenames.append(bn)
 
     # --- Copy scale reference ---
-    scale_basename: str | None = None
+    scale_basename = None
     if scale_image and os.path.exists(scale_image):
         scale_basename = os.path.basename(scale_image)
         shutil.copy2(scale_image, os.path.join(package_dir, scale_basename))

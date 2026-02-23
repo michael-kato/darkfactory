@@ -12,19 +12,19 @@ from pipeline.schema import (
 
 
 class ReportBuilder:
-    def __init__(self, metadata: AssetMetadata) -> None:
+    def __init__(self, metadata: AssetMetadata):
         self._metadata = metadata
         self._stages: list[StageResult] = []
         self._performance: PerformanceEstimates | None = None
         self._export: ExportInfo | None = None
 
-    def add_stage(self, stage_result: StageResult) -> None:
+    def add_stage(self, stage_result: StageResult):
         self._stages.append(stage_result)
 
-    def set_performance(self, p: PerformanceEstimates) -> None:
+    def set_performance(self, p: PerformanceEstimates):
         self._performance = p
 
-    def set_export(self, e: ExportInfo) -> None:
+    def set_export(self, e: ExportInfo):
         self._export = e
 
     def finalize(self) -> QaReport:

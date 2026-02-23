@@ -14,7 +14,6 @@ from __future__ import annotations
 import random
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any
 
 from pipeline.schema import CheckResult, CheckStatus, StageResult, StageStatus
 
@@ -80,35 +79,35 @@ class PBRMaterial(ABC):
 
     @property
     @abstractmethod
-    def name(self) -> str: ...
+    def name(self): ...
 
     @abstractmethod
-    def has_nodes(self) -> bool:
+    def has_nodes(self):
         """Return True if the material has any nodes (non-empty node tree)."""
         ...
 
     @abstractmethod
-    def uses_principled_bsdf(self) -> bool:
+    def uses_principled_bsdf(self):
         """Return True if a Principled BSDF node is connected to the output."""
         ...
 
     @abstractmethod
-    def uses_spec_gloss(self) -> bool:
+    def uses_spec_gloss(self):
         """Return True if a Specular BSDF or Glossiness socket is in use."""
         ...
 
     @abstractmethod
-    def orphan_image_node_count(self) -> int:
+    def orphan_image_node_count(self):
         """Return count of Image Texture nodes with no connected outputs."""
         ...
 
     @abstractmethod
-    def has_node_cycles(self) -> bool:
+    def has_node_cycles(self):
         """Return True if the node graph contains a directed cycle."""
         ...
 
     @abstractmethod
-    def albedo_pixels(self) -> list[float] | None:
+    def albedo_pixels(self):
         """Flat RGBA pixel data in sRGB [0, 1] from the Base Color texture.
 
         Returns None if no base color texture is present.
@@ -116,12 +115,12 @@ class PBRMaterial(ABC):
         ...
 
     @abstractmethod
-    def metalness_pixels(self) -> list[float] | None:
+    def metalness_pixels(self):
         """Flat RGBA pixel data in linear [0, 1] from the Metallic texture."""
         ...
 
     @abstractmethod
-    def roughness_pixels(self) -> list[float] | None:
+    def roughness_pixels(self):
         """Flat RGBA pixel data in linear [0, 1] from the Roughness texture."""
         ...
 
@@ -136,11 +135,11 @@ class PBRMeshObject(ABC):
 
     @property
     @abstractmethod
-    def name(self) -> str: ...
+    def name(self): ...
 
     @property
     @abstractmethod
-    def material_slot_count(self) -> int: ...
+    def material_slot_count(self): ...
 
 
 class PBRBlenderContext(ABC):
@@ -157,19 +156,16 @@ class PBRBlenderContext(ABC):
 # Pixel sampling helpers
 # ---------------------------------------------------------------------------
 
-_NEAR_ZERO: float = 1e-6
-_NEAR_ONE: float = 1.0 - 1e-6
+_NEAR_ZERO = 1e-6
+_NEAR_ONE = 1.0 - 1e-6
 
 
-def _rgb_samples(
-    pixels: list[float],
-    max_samples: int,
-) -> list[tuple[float, float, float]]:
+def _rgb_samples(pixels, max_samples):
     """Extract up to *max_samples* (R, G, B) tuples from a flat RGBA list."""
     total = len(pixels) // 4
     if total == 0:
         return []
-    indices: list[int] = (
+    indices = (
         random.sample(range(total), max_samples)
         if total > max_samples
         else list(range(total))
@@ -177,7 +173,7 @@ def _rgb_samples(
     return [(pixels[i * 4], pixels[i * 4 + 1], pixels[i * 4 + 2]) for i in indices]
 
 
-def _r_samples(pixels: list[float], max_samples: int) -> list[float]:
+def _r_samples(pixels, max_samples):
     """Extract up to *max_samples* R-channel values from a flat RGBA list."""
     total = len(pixels) // 4
     if total == 0:
@@ -243,7 +239,7 @@ def _check_albedo_range(
     config: PBRConfig,
 ) -> CheckResult:
     """Sample albedo pixels (sRGB [0,1]) and check they fall in [min, max] range."""
-    all_rgb: list[tuple[float, float, float]] = []
+    all_rgb = []
     for mat in materials:
         pix = mat.albedo_pixels()
         if not pix:
@@ -296,7 +292,7 @@ def _check_metalness_binary(
     config: PBRConfig,
 ) -> CheckResult:
     """Check that metalness pixels are predominantly binary (near 0 or 1)."""
-    all_values: list[float] = []
+    all_values = []
     for mat in materials:
         pix = mat.metalness_pixels()
         if not pix:
@@ -338,7 +334,7 @@ def _check_roughness_range(
     config: PBRConfig,
 ) -> CheckResult:
     """Warn if roughness texture is dominated (>50%) by pure 0 or pure 1 values."""
-    all_values: list[float] = []
+    all_values = []
     for mat in materials:
         pix = mat.roughness_pixels()
         if not pix:
@@ -379,8 +375,8 @@ def _check_roughness_range(
 
 def _check_normal_map(materials: list[PBRMaterial]) -> CheckResult:
     """Verify normal maps use Non-Color colorspace and are blue-channel dominant."""
-    colorspace_violations: list[str] = []
-    channel_violations: list[str] = []
+    colorspace_violations = []
+    channel_violations = []
 
     for mat in materials:
         for nm in mat.normal_map_data():
@@ -414,7 +410,7 @@ def _check_normal_map(materials: list[PBRMaterial]) -> CheckResult:
 
 def _check_node_graph(materials: list[PBRMaterial]) -> CheckResult:
     """Flag node graph issues: orphan image nodes, cycles, empty material slots."""
-    issues: list[str] = []
+    issues = []
     for mat in materials:
         if not mat.has_nodes():
             issues.append(f"'{mat.name}': empty material slot (no nodes)")

@@ -98,8 +98,8 @@ class QaReport:
     performance: Optional[PerformanceEstimates] = None
     export: Optional[ExportInfo] = None
 
-    def to_dict(self) -> dict:
-        def check_to_dict(c: CheckResult) -> dict:
+    def to_dict(self):
+        def check_to_dict(c: CheckResult):
             return {
                 "name": c.name,
                 "status": c.status.value,
@@ -108,7 +108,7 @@ class QaReport:
                 "message": c.message,
             }
 
-        def fix_to_dict(f: FixEntry) -> dict:
+        def fix_to_dict(f: FixEntry):
             return {
                 "action": f.action,
                 "target": f.target,
@@ -116,14 +116,14 @@ class QaReport:
                 "after_value": f.after_value,
             }
 
-        def flag_to_dict(r: ReviewFlag) -> dict:
+        def flag_to_dict(r: ReviewFlag):
             return {
                 "issue": r.issue,
                 "severity": r.severity.value,
                 "description": r.description,
             }
 
-        def stage_to_dict(s: StageResult) -> dict:
+        def stage_to_dict(s: StageResult):
             return {
                 "name": s.name,
                 "status": s.status.value,
@@ -158,7 +158,7 @@ class QaReport:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> QaReport:
+    def from_dict(cls, d) -> QaReport:
         meta = d["metadata"]
         metadata = AssetMetadata(
             asset_id=meta["asset_id"],

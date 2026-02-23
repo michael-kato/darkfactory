@@ -65,13 +65,13 @@ class SceneMeshObject(ABC):
 
     @property
     @abstractmethod
-    def name(self) -> str: ...
+    def name(self): ...
 
     @abstractmethod
-    def triangle_count(self) -> int: ...
+    def triangle_count(self): ...
 
     @abstractmethod
-    def material_slot_count(self) -> int: ...
+    def material_slot_count(self): ...
 
 
 class SceneArmatureObject(ABC):
@@ -79,10 +79,10 @@ class SceneArmatureObject(ABC):
 
     @property
     @abstractmethod
-    def name(self) -> str: ...
+    def name(self): ...
 
     @abstractmethod
-    def bone_count(self) -> int: ...
+    def bone_count(self): ...
 
 
 class SceneImage(ABC):
@@ -90,21 +90,21 @@ class SceneImage(ABC):
 
     @property
     @abstractmethod
-    def width(self) -> int: ...
+    def width(self): ...
 
     @property
     @abstractmethod
-    def height(self) -> int: ...
+    def height(self): ...
 
     @property
     @abstractmethod
-    def channels(self) -> int:
+    def channels(self):
         """Number of colour channels (e.g. 3 for RGB, 4 for RGBA)."""
         ...
 
     @property
     @abstractmethod
-    def bit_depth(self) -> int:
+    def bit_depth(self):
         """Bits per channel per pixel (e.g. 8 for standard 8-bit images)."""
         ...
 
@@ -124,7 +124,7 @@ class SceneBlenderContext(ABC):
         ...
 
     @abstractmethod
-    def orphan_counts(self) -> dict[str, int]:
+    def orphan_counts(self):
         """Return counts of data-blocks with zero users.
 
         Expected keys: ``'meshes'``, ``'materials'``, ``'images'``.
@@ -157,7 +157,7 @@ def _check_naming_conventions(
     )
 
 
-def _check_orphan_data(orphan_counts: dict[str, int]) -> CheckResult:
+def _check_orphan_data(orphan_counts) -> CheckResult:
     total = sum(orphan_counts.values())
     return CheckResult(
         name="orphan_data",
@@ -255,7 +255,7 @@ def _check_collision_presence(
 # Performance estimate helpers
 # ---------------------------------------------------------------------------
 
-_MIP_MULTIPLIER: float = 4.0 / 3.0
+_MIP_MULTIPLIER = 4.0 / 3.0
 
 
 def _compute_performance(

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
 
 from pipeline.schema import CheckResult, CheckStatus, StageResult, StageStatus
 
@@ -74,7 +73,7 @@ class TextureMaterial(ABC):
 
     @property
     @abstractmethod
-    def name(self) -> str: ...
+    def name(self): ...
 
     @abstractmethod
     def image_texture_nodes(self) -> list[ImageTextureNode]:
@@ -87,23 +86,23 @@ class TextureImage(ABC):
 
     @property
     @abstractmethod
-    def name(self) -> str: ...
+    def name(self): ...
 
     @property
     @abstractmethod
-    def size(self) -> tuple[int, int]:
+    def size(self):
         """Return (width, height) in pixels."""
         ...
 
     @property
     @abstractmethod
-    def depth(self) -> int:
+    def depth(self):
         """Return bit depth (e.g. 24 for RGB 8-bit, 32 for RGBA 8-bit)."""
         ...
 
     @property
     @abstractmethod
-    def colorspace_name(self) -> str:
+    def colorspace_name(self):
         """Return the color space name (e.g. 'sRGB', 'Non-Color', 'Linear')."""
         ...
 
@@ -122,16 +121,16 @@ class TextureBlenderContext(ABC):
 # Color space inference helpers
 # ---------------------------------------------------------------------------
 
-_SRGB_KEYWORDS: tuple[str, ...] = (
+_SRGB_KEYWORDS = (
     "albedo", "diffuse", "color", "colour", "basecolor", "base_color",
 )
-_LINEAR_KEYWORDS: tuple[str, ...] = (
+_LINEAR_KEYWORDS = (
     "normal", "rough", "roughness", "metal", "metallic",
     "ao", "ambient_occlusion", "specular", "height", "bump", "displacement",
 )
 
 
-def _infer_expected_colorspace(socket_name: str, image_name: str) -> str | None:
+def _infer_expected_colorspace(socket_name, image_name):
     """Infer expected color space from socket and image name keywords.
 
     Returns ``'sRGB'``, ``'Non-Color'``, or ``None`` if no keyword matches.
@@ -172,7 +171,7 @@ def _check_missing_textures(
     )
 
 
-def _is_power_of_two(n: int) -> bool:
+def _is_power_of_two(n):
     return n > 0 and (n & (n - 1)) == 0
 
 
@@ -184,7 +183,7 @@ def _check_resolution_limit(
         config.max_resolution_hero if config.is_hero_asset
         else config.max_resolution_standard
     )
-    violations: list[dict[str, Any]] = []
+    violations = []
     for img in images:
         w, h = img.size
         if w > limit or h > limit:
@@ -204,7 +203,7 @@ def _check_resolution_limit(
 def _check_power_of_two(
     images: list[TextureImage],
 ) -> CheckResult:
-    violations: list[dict[str, Any]] = []
+    violations = []
     for img in images:
         w, h = img.size
         if not (_is_power_of_two(w) and _is_power_of_two(h)):
@@ -276,7 +275,7 @@ def _check_color_space(
     images: list[TextureImage],
 ) -> CheckResult:
     image_by_name = {img.name: img for img in images}
-    violations: list[dict[str, Any]] = []
+    violations = []
 
     for mat in materials:
         for node in mat.image_texture_nodes():

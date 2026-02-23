@@ -10,9 +10,8 @@ import json
 import sys
 import uuid
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
 
 from pipeline.report_builder import ReportBuilder
 from pipeline.schema import (
@@ -86,7 +85,7 @@ def run_intake(config: IntakeConfig) -> QaReport:
 
     # --- Size check ---
     file_size = path.stat().st_size
-    category_limit: Optional[int] = config.max_size_bytes.get(
+    category_limit = config.max_size_bytes.get(
         config.category, config.max_size_bytes.get("*")
     )
 
@@ -126,9 +125,9 @@ def run_intake(config: IntakeConfig) -> QaReport:
 
 
 def _build_report(
-    asset_id: str,
+    asset_id,
     config: IntakeConfig,
-    now: datetime,
+    now,
     stage_status: StageStatus,
     checks: list[CheckResult],
 ) -> QaReport:
@@ -150,7 +149,7 @@ def _build_report(
 # CLI entry point:  python -m pipeline.intake <file> --source ... etc.
 # ---------------------------------------------------------------------------
 
-def _parse_args(argv: list[str] | None = None):
+def _parse_args(argv=None):
     import argparse
 
     parser = argparse.ArgumentParser(
@@ -169,7 +168,7 @@ def _parse_args(argv: list[str] | None = None):
     return parser.parse_args(argv)
 
 
-def _stage_to_dict(stage: StageResult) -> dict:
+def _stage_to_dict(stage: StageResult):
     return {
         "name": stage.name,
         "status": stage.status.value,
