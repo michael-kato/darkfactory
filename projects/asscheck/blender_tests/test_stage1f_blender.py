@@ -1,28 +1,27 @@
-"""Blender integration test for Stage 1f — Scene & Hierarchy Checks.
+"""Integration test for Stage 1f scene & hierarchy checks — runs inside Blender headless.
 
-Run with:
-    blender --background --python blender_tests/test_stage1f_blender.py
+Usage (headless):  blender --background --python blender_tests/test_stage1f_blender.py
+Usage (GUI):       Open in Blender Text Editor, press Alt+R
 
-Loads the sample glTF asset (street_lamp_01_quant.gltf), runs the scene
-checks, and verifies that all PerformanceEstimates fields are non-negative
-numbers.
+Tests:
+  1. Smoke test: load street_lamp_01.gltf (or empty scene), run check_scene,
+     assert valid result structure and non-negative PerformanceEstimates.
+
+Skips gracefully if assets/ is missing.
 """
 from __future__ import annotations
 
 import json
-import os
 import sys
+from pathlib import Path
 
-try:
-    import bpy
-except ImportError:
-    print("ERROR: bpy not available — run this script via Blender headless")
-    sys.exit(1)
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
-# Add the project root to sys.path so pipeline imports work.
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, _PROJECT_ROOT)
+ASSETS_DIR = _PROJECT_ROOT / "assets"
+
+import bpy  # noqa: E402
 
 from pipeline.schema import StageStatus  # noqa: E402
 from pipeline.stage1.scene import (  # noqa: E402
@@ -36,13 +35,11 @@ from pipeline.stage1.scene import (  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
-# Real bpy wrappers
+# bpy-backed wrappers
 # ---------------------------------------------------------------------------
 
 class BpyMeshObject(SceneMeshObject):
-    """Wraps a bpy.types.Object of type MESH."""
-
-    def __init__(self, obj: "bpy.types.Object") -> None:
+    def __init__(self, obj: bpy.types.Object) -> None:
         self._obj = obj
 
     @property
@@ -58,9 +55,7 @@ class BpyMeshObject(SceneMeshObject):
 
 
 class BpyArmatureObject(SceneArmatureObject):
-    """Wraps a bpy.types.Object of type ARMATURE."""
-
-    def __init__(self, obj: "bpy.types.Object") -> None:
+    def __init__(self, obj: bpy.types.Object) -> None:
         self._obj = obj
 
     @property
@@ -72,9 +67,7 @@ class BpyArmatureObject(SceneArmatureObject):
 
 
 class BpySceneImage(SceneImage):
-    """Wraps a bpy.types.Image."""
-
-    def __init__(self, image: "bpy.types.Image") -> None:
+    def __init__(self, image: bpy.types.Image) -> None:
         self._image = image
 
     @property
@@ -91,15 +84,12 @@ class BpySceneImage(SceneImage):
 
     @property
     def bit_depth(self) -> int:
-        # bpy.types.Image.depth reports total bits per pixel; divide by channels.
         if self._image.channels > 0:
             return self._image.depth // self._image.channels
         return 8
 
 
 class BpySceneContext(SceneBlenderContext):
-    """Reads scene, armature, image, and orphan data from the active Blender scene."""
-
     def mesh_objects(self) -> list[BpyMeshObject]:
         return [
             BpyMeshObject(obj)
@@ -129,23 +119,34 @@ class BpySceneContext(SceneBlenderContext):
         }
 
 
+def _clear_scene() -> None:
+    bpy.ops.object.select_all(action="SELECT")
+    bpy.ops.object.delete(use_global=False)
+    for block in list(bpy.data.meshes):
+        bpy.data.meshes.remove(block, do_unlink=True)
+    for block in list(bpy.data.materials):
+        bpy.data.materials.remove(block, do_unlink=True)
+    for block in list(bpy.data.images):
+        bpy.data.images.remove(block, do_unlink=True)
+
+
 # ---------------------------------------------------------------------------
-# Test runner
+# Test entry point
 # ---------------------------------------------------------------------------
 
-def main() -> None:
-    sample = os.path.join(
-        _PROJECT_ROOT,
-        "asscheck_uproj",
-        "Assets",
-        "Models",
-        "street_lamp_01_quant.gltf",
-    )
+def run_tests() -> dict:
+    """Run all stage1f scene tests. Returns dict with 'passed' key."""
+    if not ASSETS_DIR.exists():
+        return {"skipped": True, "reason": f"assets dir not found: {ASSETS_DIR}"}
 
-    if os.path.exists(sample):
-        bpy.ops.import_scene.gltf(filepath=sample)
-    else:
-        print(f"WARNING: sample asset not found at {sample} — using default scene")
+    failures: list[str] = []
+    tests_run = 0
+
+    # Smoke test: real asset (or empty scene as fallback)
+    asset = ASSETS_DIR / "street_lamp_01.gltf"
+    _clear_scene()
+    if asset.exists():
+        bpy.ops.import_scene.gltf(filepath=str(asset))
 
     config = SceneConfig(
         object_naming_pattern=r"^[A-Za-z0-9_]+",
@@ -154,39 +155,28 @@ def main() -> None:
         lod_suffix_pattern=r"_LOD\d+$",
         collision_suffix_pattern=r"_Collision$",
     )
-
     ctx = BpySceneContext()
     stage_result, perf = check_scene(ctx, config)
+    tests_run += 1
 
-    # Verify performance estimates are non-negative numbers.
-    assert perf.triangle_count >= 0, (
-        f"Expected triangle_count >= 0, got {perf.triangle_count}"
-    )
-    assert perf.draw_call_estimate >= 0, (
-        f"Expected draw_call_estimate >= 0, got {perf.draw_call_estimate}"
-    )
-    assert perf.vram_estimate_mb >= 0.0, (
-        f"Expected vram_estimate_mb >= 0.0, got {perf.vram_estimate_mb}"
-    )
-    assert perf.bone_count >= 0, (
-        f"Expected bone_count >= 0, got {perf.bone_count}"
-    )
+    if stage_result.name != "scene":
+        failures.append(f"smoke: stage name '{stage_result.name}' != 'scene'")
+    if stage_result.status not in (StageStatus.PASS, StageStatus.FAIL):
+        failures.append(f"smoke: unexpected status {stage_result.status.value}")
+    if perf.triangle_count < 0:
+        failures.append(f"smoke: triangle_count < 0: {perf.triangle_count}")
+    if perf.draw_call_estimate < 0:
+        failures.append(f"smoke: draw_call_estimate < 0: {perf.draw_call_estimate}")
+    if perf.vram_estimate_mb < 0.0:
+        failures.append(f"smoke: vram_estimate_mb < 0: {perf.vram_estimate_mb}")
+    if perf.bone_count < 0:
+        failures.append(f"smoke: bone_count < 0: {perf.bone_count}")
 
-    # Serialise to JSON and verify round-trip.
-    output = {
+    json.loads(json.dumps({
         "stage": {
             "name": stage_result.name,
             "status": stage_result.status.value,
-            "checks": [
-                {
-                    "name": c.name,
-                    "status": c.status.value,
-                    "measured_value": c.measured_value,
-                    "threshold": c.threshold,
-                    "message": c.message,
-                }
-                for c in stage_result.checks
-            ],
+            "checks": [{"name": c.name, "status": c.status.value} for c in stage_result.checks],
         },
         "performance": {
             "triangle_count": perf.triangle_count,
@@ -194,23 +184,16 @@ def main() -> None:
             "vram_estimate_mb": perf.vram_estimate_mb,
             "bone_count": perf.bone_count,
         },
-    }
+    }))
 
-    json_str = json.dumps(output, indent=2)
-    json.loads(json_str)  # Verify it round-trips without error.
+    return {"passed": len(failures) == 0, "tests_run": tests_run, "failures": failures}
 
-    assert output["stage"]["name"] == "scene", (
-        f"Expected stage name 'scene', got '{output['stage']['name']}'"
-    )
-    assert output["stage"]["status"] in (
-        StageStatus.PASS.value,
-        StageStatus.FAIL.value,
-    ), f"Unexpected stage status: {output['stage']['status']}"
 
-    print(json_str)
-    print("PASS: Stage 1f scene integration test passed")
-    sys.exit(0)
+def _main() -> None:
+    r = run_tests()
+    print(json.dumps(r, indent=2))
+    sys.exit(0 if r.get("passed", r.get("skipped", False)) else 1)
 
 
 if __name__ == "__main__":
-    main()
+    _main()

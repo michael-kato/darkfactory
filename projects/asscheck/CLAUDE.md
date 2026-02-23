@@ -90,26 +90,41 @@ Design rules for known-bad assets:
 - UV checks: UV layer present, no material
 - Material/PBR checks: material present, minimal geometry
 
-## Two-Tier Test Strategy
+## Test Strategy
 
-### Unit Tests (`tests/`) — fast, no Blender required
-Use mock `BlenderContext` objects to inject synthetic vertex/face/UV data.
-Tests check the check logic itself, not the Blender integration.
+### Pure Python Tests (`tests/`) — schema and intake only
+Tests for `pipeline/schema.py` (serialization) and `pipeline/stage0/intake.py`
+(file format/size logic). No Blender dependency. Fast.
 Run with: `python -m pytest tests/ -v`
 
-### Integration Tests (`blender_tests/`) — requires Blender
-Run real pipeline stages against real and known-bad assets in `assets/`.
-Skip gracefully if `ASSETS_DIR` is missing (so CI can run unit tests only).
-Run with: `blender --background --python blender_tests/<script>.py`
+### Integration Tests (`blender_tests/`) — primary test gate
+Real Blender runs against real assets and known-bad GLBs. These are the authoritative
+tests for all Stage 1+ pipeline logic. The `blender_tests/run_all.py` entry point
+runs every stage test in a single Blender process.
 
-## Running Tests
+Each test script exports `run_tests() -> dict` so it can be:
+- Run standalone: `blender --background --python blender_tests/test_stage1a_blender.py`
+- Run all at once: `blender --background --python blender_tests/run_all.py`
+- Run interactively: open in Blender Text Editor, press `Alt+R`
+
+Test files skip gracefully if `assets/` is missing.
+
+### Running Tests
 ```bash
-# Unit tests (fast, no Blender)
-cd projects/asscheck && source .venv/bin/activate
-python -m pytest tests/ -v
+# Full test suite (runs everything: pytest + blender integration)
+./test.sh
 
-# Integration tests (requires Blender + assets/)
+# Quick pure-Python only (no Blender)
+source .venv/bin/activate && python -m pytest tests/ -v
+
+# Blender integration only
+/opt/blender-5.0.1-linux-x64/blender --background --python blender_tests/run_all.py
+
+# Single stage
 /opt/blender-5.0.1-linux-x64/blender --background --python blender_tests/test_stage1a_blender.py
+
+# GUI (interactive, no process spawn — for development iteration)
+# Open run_all.py or any test script in Blender Text Editor → Alt+R
 ```
 
 ## Pipeline Stages & Status

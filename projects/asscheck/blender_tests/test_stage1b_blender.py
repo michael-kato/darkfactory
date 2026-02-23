@@ -1,28 +1,28 @@
-"""Blender integration test for Stage 1b UV checks.
+"""Integration test for Stage 1b UV checks — runs inside Blender headless.
 
-Run with:
-    blender --background --python blender_tests/test_stage1b_blender.py
+Usage (headless):  blender --background --python blender_tests/test_stage1b_blender.py
+Usage (GUI):       Open in Blender Text Editor, press Alt+R
 
-Loads the sample glTF asset, runs UV checks, and asserts the result is valid
-JSON with the expected structure and no crashes.
+Tests:
+  1. Smoke test: load street_lamp_01.gltf, run check_uvs, assert valid structure.
+  2. Known-bad GLBs: no_uvs, uvs_out_of_bounds, uv_overlap — assert expected FAIL.
+
+Both tests skip gracefully if assets/ is missing.
 """
 from __future__ import annotations
 
 import json
-import os
 import sys
+from pathlib import Path
 
-try:
-    import bpy
-    import bmesh as _bmesh
-except ImportError:
-    print("ERROR: bpy not available — run this script via Blender headless")
-    sys.exit(1)
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
-# Add the project root to sys.path so pipeline imports work.
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, _PROJECT_ROOT)
+ASSETS_DIR = _PROJECT_ROOT / "assets"
+
+import bpy  # noqa: E402
+import bmesh as _bmesh  # noqa: E402
 
 from pipeline.stage1.uv import (  # noqa: E402
     UVBlenderContext,
@@ -33,21 +33,19 @@ from pipeline.stage1.uv import (  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
-# Real bpy wrappers
+# bpy-backed wrappers
 # ---------------------------------------------------------------------------
 
 class BpyUVMeshObject(UVMeshObject):
-    """Wraps a bpy mesh object for UV analysis."""
-
-    def __init__(self, obj: "bpy.types.Object") -> None:
+    def __init__(self, obj: bpy.types.Object) -> None:
         self._obj = obj
-        self._bm: "_bmesh.types.BMesh | None" = None
+        self._bm = None
 
     @property
     def name(self) -> str:
         return self._obj.name
 
-    def _ensure_bm(self) -> "_bmesh.types.BMesh":
+    def _ensure_bm(self):
         if self._bm is None:
             self._bm = _bmesh.new()
             self._bm.from_mesh(self._obj.data)
@@ -64,9 +62,7 @@ class BpyUVMeshObject(UVMeshObject):
             return []
         return [(ld.uv[0], ld.uv[1]) for ld in layer.data]
 
-    def uv_triangles(
-        self, layer_name: str
-    ) -> list[tuple[tuple[float, float], tuple[float, float], tuple[float, float]]]:
+    def uv_triangles(self, layer_name: str) -> list[tuple]:
         bm = self._ensure_bm()
         uv_layer = bm.loops.layers.uv.get(layer_name)
         if uv_layer is None:
@@ -74,7 +70,7 @@ class BpyUVMeshObject(UVMeshObject):
         result = []
         for face in bm.faces:
             if len(face.loops) == 3:
-                coords: tuple = tuple(
+                coords = tuple(
                     (loop[uv_layer].uv[0], loop[uv_layer].uv[1])
                     for loop in face.loops
                 )
@@ -107,66 +103,90 @@ class BpyUVBlenderContext(UVBlenderContext):
         ]
 
 
+def _clear_scene() -> None:
+    bpy.ops.object.select_all(action="SELECT")
+    bpy.ops.object.delete(use_global=False)
+    for block in list(bpy.data.meshes):
+        bpy.data.meshes.remove(block, do_unlink=True)
+    for block in list(bpy.data.materials):
+        bpy.data.materials.remove(block, do_unlink=True)
+    for block in list(bpy.data.images):
+        bpy.data.images.remove(block, do_unlink=True)
+
+
+KNOWN_BAD_CASES = [
+    ("no_uvs.glb",            "missing_uvs"),
+    ("uvs_out_of_bounds.glb", "uv_bounds"),
+    ("uv_overlap.glb",        "uv_overlap"),
+]
+
+EXPECTED_CHECK_NAMES = {
+    "missing_uvs", "uv_bounds", "uv_overlap", "texel_density", "lightmap_uv2",
+}
+
+
 # ---------------------------------------------------------------------------
-# Test runner
+# Test entry point
 # ---------------------------------------------------------------------------
 
-def main() -> None:
-    sample = os.path.join(
-        _PROJECT_ROOT,
-        "asscheck_uproj",
-        "Assets",
-        "Models",
-        "street_lamp_01_quant.gltf",
-    )
+def run_tests() -> dict:
+    """Run all stage1b UV tests. Returns dict with 'passed' key."""
+    if not ASSETS_DIR.exists():
+        return {"skipped": True, "reason": f"assets dir not found: {ASSETS_DIR}"}
 
-    if os.path.exists(sample):
-        bpy.ops.import_scene.gltf(filepath=sample)
-    else:
-        print(f"WARNING: sample asset not found at {sample} — using default scene")
+    failures: list[str] = []
+    tests_run = 0
 
-    ctx = BpyUVBlenderContext()
-    config = UVConfig()
-    result = check_uvs(ctx, config)
+    # Smoke test: real asset
+    asset = ASSETS_DIR / "street_lamp_01.gltf"
+    if asset.exists():
+        _clear_scene()
+        bpy.ops.import_scene.gltf(filepath=str(asset))
+        ctx = BpyUVBlenderContext()
+        result = check_uvs(ctx, UVConfig())
+        tests_run += 1
 
-    # Serialise to JSON and verify round-trip.
-    stage_dict = {
-        "name": result.name,
-        "status": result.status.value,
-        "checks": [
-            {
-                "name": c.name,
-                "status": c.status.value,
-                "measured_value": c.measured_value,
-                "threshold": c.threshold,
-                "message": c.message,
-            }
-            for c in result.checks
-        ],
-    }
+        if result.name != "uv":
+            failures.append(f"smoke: stage name '{result.name}' != 'uv'")
+        if len(result.checks) != 5:
+            failures.append(f"smoke: expected 5 checks, got {len(result.checks)}")
+        missing = EXPECTED_CHECK_NAMES - {c.name for c in result.checks}
+        if missing:
+            failures.append(f"smoke: missing checks: {missing}")
+        json.loads(json.dumps({
+            "stage": result.name,
+            "checks": [{"name": c.name, "status": c.status.value} for c in result.checks],
+        }))
 
-    json_str = json.dumps(stage_dict, indent=2)
-    data = json.loads(json_str)  # Verify it round-trips without error.
+    # Known-bad GLBs
+    bad_dir = ASSETS_DIR / "known-bad"
+    if bad_dir.exists():
+        for filename, check_name in KNOWN_BAD_CASES:
+            glb = bad_dir / filename
+            if not glb.exists():
+                continue
+            _clear_scene()
+            bpy.ops.import_scene.gltf(filepath=str(glb))
+            ctx = BpyUVBlenderContext()
+            result = check_uvs(ctx, UVConfig())
+            tests_run += 1
 
-    assert data["name"] == "uv", f"Expected stage name 'uv', got '{data['name']}'"
-    assert len(data["checks"]) == 5, f"Expected 5 checks, got {len(data['checks'])}"
+            check = next((c for c in result.checks if c.name == check_name), None)
+            if check is None:
+                failures.append(f"{filename}: check '{check_name}' not found")
+            elif check.status.value != "FAIL":
+                failures.append(
+                    f"{filename}: expected '{check_name}' FAIL, got {check.status.value}"
+                )
 
-    check_names = {c["name"] for c in data["checks"]}
-    expected_names = {
-        "missing_uvs",
-        "uv_bounds",
-        "uv_overlap",
-        "texel_density",
-        "lightmap_uv2",
-    }
-    assert check_names == expected_names, (
-        f"Unexpected check names: {check_names - expected_names}"
-    )
+    return {"passed": len(failures) == 0, "tests_run": tests_run, "failures": failures}
 
-    print(json_str)
-    print("PASS: Stage 1b UV checks integration test passed")
-    sys.exit(0)
+
+def _main() -> None:
+    r = run_tests()
+    print(json.dumps(r, indent=2))
+    sys.exit(0 if r.get("passed", r.get("skipped", False)) else 1)
 
 
 if __name__ == "__main__":
-    main()
+    _main()

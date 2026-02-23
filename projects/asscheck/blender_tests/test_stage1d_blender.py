@@ -1,27 +1,31 @@
-"""Blender integration test for Stage 1d PBR validation.
+"""Integration test for Stage 1d PBR validation — runs inside Blender headless.
 
-Run with:
-    blender --background --python blender_tests/test_stage1d_blender.py
+Usage (headless):  blender --background --python blender_tests/test_stage1d_blender.py
+Usage (GUI):       Open in Blender Text Editor, press Alt+R
 
-Loads the sample glTF asset, runs PBR checks, and asserts the result is
-valid JSON with the expected structure and no crashes.
+Tests:
+  1. Smoke test: load street_lamp_01.gltf, run check_pbr, assert valid structure.
+  2. Programmatic known-bad: create a scene with an Emission shader (non-PBR),
+     assert the pbr_workflow check returns FAIL.
+
+Note: GLB export/import converts Emission to a PBR-compatible material, so
+non_pbr_material.glb cannot be used here. The violation is created programmatically.
+
+Both tests skip gracefully if assets/ is missing.
 """
 from __future__ import annotations
 
 import json
-import os
 import sys
+from pathlib import Path
 
-try:
-    import bpy
-except ImportError:
-    print("ERROR: bpy not available — run this script via Blender headless")
-    sys.exit(1)
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
-# Add the project root to sys.path so pipeline imports work.
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, _PROJECT_ROOT)
+ASSETS_DIR = _PROJECT_ROOT / "assets"
+
+import bpy  # noqa: E402
 
 from pipeline.stage1.pbr import (  # noqa: E402
     NormalMapData,
@@ -38,24 +42,17 @@ from pipeline.stage1.pbr import (  # noqa: E402
 # ---------------------------------------------------------------------------
 
 def _linear_to_srgb(v: float) -> float:
-    """Convert a single linear [0, 1] value to sRGB [0, 1]."""
     v = max(0.0, min(1.0, v))
     if v <= 0.0031308:
         return v * 12.92
     return 1.055 * (v ** (1.0 / 2.4)) - 0.055
 
 
-def _get_image_pixels_srgb(image: "bpy.types.Image") -> list[float] | None:
-    """Return flat RGBA pixels from a bpy Image, converted to sRGB [0, 1].
-
-    bpy stores pixels in linear space; we convert to sRGB for the albedo check.
-    Returns None if the image has no data loaded.
-    """
+def _get_image_pixels_srgb(image: bpy.types.Image) -> list[float] | None:
     try:
         if not image.has_data:
             return None
         linear = list(image.pixels)
-        # Apply linear → sRGB to R, G, B; keep A as-is.
         out: list[float] = []
         for i in range(0, len(linear), 4):
             out.append(_linear_to_srgb(linear[i]))
@@ -67,8 +64,7 @@ def _get_image_pixels_srgb(image: "bpy.types.Image") -> list[float] | None:
         return None
 
 
-def _get_image_pixels_linear(image: "bpy.types.Image") -> list[float] | None:
-    """Return flat RGBA pixels in linear [0, 1] from a bpy Image."""
+def _get_image_pixels_linear(image: bpy.types.Image) -> list[float] | None:
     try:
         if not image.has_data:
             return None
@@ -77,14 +73,9 @@ def _get_image_pixels_linear(image: "bpy.types.Image") -> list[float] | None:
         return None
 
 
-def _get_tex_image_for_socket(
-    node_tree: "bpy.types.NodeTree",
-    socket_name: str,
-) -> "bpy.types.Image | None":
-    """Follow the link on a Principled BSDF socket back to a TEX_IMAGE node."""
+def _get_tex_image_for_socket(node_tree: bpy.types.NodeTree, socket_name: str):
     pbsdf = next(
-        (n for n in node_tree.nodes if n.type == "BSDF_PRINCIPLED"),
-        None,
+        (n for n in node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None
     )
     if pbsdf is None:
         return None
@@ -97,15 +88,11 @@ def _get_tex_image_for_socket(
     return None
 
 
-def _has_output_link(
-    node: "bpy.types.Node",
-    node_tree: "bpy.types.NodeTree",
-) -> bool:
+def _has_output_link(node: bpy.types.Node, node_tree: bpy.types.NodeTree) -> bool:
     return any(link.from_node == node for link in node_tree.links)
 
 
-def _detect_cycles(node_tree: "bpy.types.NodeTree") -> bool:
-    """Detect directed cycles using DFS on the node graph."""
+def _detect_cycles(node_tree: bpy.types.NodeTree) -> bool:
     successors: dict[str, list[str]] = {n.name: [] for n in node_tree.nodes}
     for link in node_tree.links:
         successors[link.from_node.name].append(link.to_node.name)
@@ -133,13 +120,11 @@ def _detect_cycles(node_tree: "bpy.types.NodeTree") -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Real bpy wrappers
+# bpy-backed wrappers
 # ---------------------------------------------------------------------------
 
 class BpyPBRMeshObject(PBRMeshObject):
-    """Wraps a bpy.types.Object for material slot inspection."""
-
-    def __init__(self, obj: "bpy.types.Object") -> None:
+    def __init__(self, obj: bpy.types.Object) -> None:
         self._obj = obj
 
     @property
@@ -152,9 +137,7 @@ class BpyPBRMeshObject(PBRMeshObject):
 
 
 class BpyPBRMaterial(PBRMaterial):
-    """Wraps a bpy.types.Material for PBR node graph introspection."""
-
-    def __init__(self, mat: "bpy.types.Material") -> None:
+    def __init__(self, mat: bpy.types.Material) -> None:
         self._mat = mat
 
     @property
@@ -198,8 +181,7 @@ class BpyPBRMaterial(PBRMaterial):
             return 0
         tree = self._mat.node_tree
         return sum(
-            1
-            for node in tree.nodes
+            1 for node in tree.nodes
             if node.type == "TEX_IMAGE" and not _has_output_link(node, tree)
         )
 
@@ -247,18 +229,15 @@ class BpyPBRMaterial(PBRMaterial):
             if img_node.type != "TEX_IMAGE" or img_node.image is None:
                 continue
             image = img_node.image
-            pixels = _get_image_pixels_linear(image)
             data.append(NormalMapData(
                 image_name=image.name,
                 colorspace=image.colorspace_settings.name,
-                pixels=pixels,
+                pixels=_get_image_pixels_linear(image),
             ))
         return data
 
 
 class BpyPBRBlenderContext(PBRBlenderContext):
-    """Reads mesh objects and materials from the active Blender scene."""
-
     def mesh_objects(self) -> list[PBRMeshObject]:
         return [
             BpyPBRMeshObject(obj)
@@ -274,72 +253,98 @@ class BpyPBRBlenderContext(PBRBlenderContext):
         ]
 
 
+def _clear_scene() -> None:
+    bpy.ops.object.select_all(action="SELECT")
+    bpy.ops.object.delete(use_global=False)
+    for block in list(bpy.data.meshes):
+        bpy.data.meshes.remove(block, do_unlink=True)
+    for block in list(bpy.data.materials):
+        bpy.data.materials.remove(block, do_unlink=True)
+    for block in list(bpy.data.images):
+        bpy.data.images.remove(block, do_unlink=True)
+
+
+def _create_emission_scene() -> None:
+    """Create a minimal scene: mesh with Emission shader (non-PBR)."""
+    _clear_scene()
+    mesh = bpy.data.meshes.new("test_mesh")
+    obj = bpy.data.objects.new("test_obj", mesh)
+    bpy.context.scene.collection.objects.link(obj)
+    mesh.from_pydata([(0, 0, 0), (1, 0, 0), (0.5, 1, 0)], [], [(0, 1, 2)])
+    mesh.update()
+
+    mat = bpy.data.materials.new("emission_mat")
+    mat.use_nodes = True
+    nodes = mat.node_tree.nodes
+    links = mat.node_tree.links
+    nodes.clear()
+    emission = nodes.new("ShaderNodeEmission")
+    output = nodes.new("ShaderNodeOutputMaterial")
+    links.new(emission.outputs["Emission"], output.inputs["Surface"])
+    obj.data.materials.append(mat)
+
+
+EXPECTED_CHECK_NAMES = {
+    "pbr_workflow", "material_slots", "albedo_range",
+    "metalness_binary", "roughness_range", "normal_map", "node_graph",
+}
+
+
 # ---------------------------------------------------------------------------
-# Test runner
+# Test entry point
 # ---------------------------------------------------------------------------
 
-def main() -> None:
-    sample = os.path.join(
-        _PROJECT_ROOT,
-        "asscheck_uproj",
-        "Assets",
-        "Models",
-        "street_lamp_01_quant.gltf",
-    )
+def run_tests() -> dict:
+    """Run all stage1d PBR tests. Returns dict with 'passed' key."""
+    if not ASSETS_DIR.exists():
+        return {"skipped": True, "reason": f"assets dir not found: {ASSETS_DIR}"}
 
-    if os.path.exists(sample):
-        bpy.ops.import_scene.gltf(filepath=sample)
-    else:
-        print(f"WARNING: sample asset not found at {sample} — using default scene")
+    failures: list[str] = []
+    tests_run = 0
 
+    # Smoke test: real asset
+    asset = ASSETS_DIR / "street_lamp_01.gltf"
+    if asset.exists():
+        _clear_scene()
+        bpy.ops.import_scene.gltf(filepath=str(asset))
+        ctx = BpyPBRBlenderContext()
+        result = check_pbr(ctx, PBRConfig())
+        tests_run += 1
+
+        if result.name != "pbr":
+            failures.append(f"smoke: stage name '{result.name}' != 'pbr'")
+        if len(result.checks) != 7:
+            failures.append(f"smoke: expected 7 checks, got {len(result.checks)}")
+        missing = EXPECTED_CHECK_NAMES - {c.name for c in result.checks}
+        if missing:
+            failures.append(f"smoke: missing checks: {missing}")
+        json.loads(json.dumps({
+            "stage": result.name,
+            "checks": [{"name": c.name, "status": c.status.value} for c in result.checks],
+        }))
+
+    # Known-bad: Emission shader → pbr_workflow should FAIL
+    _create_emission_scene()
     ctx = BpyPBRBlenderContext()
-    config = PBRConfig()
-    result = check_pbr(ctx, config)
+    result = check_pbr(ctx, PBRConfig())
+    tests_run += 1
 
-    # Serialise to JSON and verify round-trip.
-    stage_dict = {
-        "name": result.name,
-        "status": result.status.value,
-        "checks": [
-            {
-                "name": c.name,
-                "status": c.status.value,
-                "measured_value": c.measured_value,
-                "threshold": c.threshold,
-                "message": c.message,
-            }
-            for c in result.checks
-        ],
-    }
+    check = next((c for c in result.checks if c.name == "pbr_workflow"), None)
+    if check is None:
+        failures.append("emission_mat: check 'pbr_workflow' not found")
+    elif check.status.value != "FAIL":
+        failures.append(
+            f"emission_mat: expected 'pbr_workflow' FAIL, got {check.status.value}"
+        )
 
-    json_str = json.dumps(stage_dict, indent=2)
-    data = json.loads(json_str)  # Verify it round-trips without error.
+    return {"passed": len(failures) == 0, "tests_run": tests_run, "failures": failures}
 
-    assert data["name"] == "pbr", (
-        f"Expected stage name 'pbr', got '{data['name']}'"
-    )
-    assert len(data["checks"]) == 7, (
-        f"Expected 7 checks, got {len(data['checks'])}"
-    )
 
-    check_names = {c["name"] for c in data["checks"]}
-    expected_names = {
-        "pbr_workflow",
-        "material_slots",
-        "albedo_range",
-        "metalness_binary",
-        "roughness_range",
-        "normal_map",
-        "node_graph",
-    }
-    assert check_names == expected_names, (
-        f"Unexpected check names: {check_names - expected_names}"
-    )
-
-    print(json_str)
-    print("PASS: Stage 1d PBR validation integration test passed")
-    sys.exit(0)
+def _main() -> None:
+    r = run_tests()
+    print(json.dumps(r, indent=2))
+    sys.exit(0 if r.get("passed", r.get("skipped", False)) else 1)
 
 
 if __name__ == "__main__":
-    main()
+    _main()

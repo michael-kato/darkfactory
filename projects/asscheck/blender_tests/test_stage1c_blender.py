@@ -1,27 +1,32 @@
-"""Blender integration test for Stage 1c Texture checks.
+"""Integration test for Stage 1c texture checks — runs inside Blender headless.
 
-Run with:
-    blender --background --python blender_tests/test_stage1c_blender.py
+Usage (headless):  blender --background --python blender_tests/test_stage1c_blender.py
+Usage (GUI):       Open in Blender Text Editor, press Alt+R
 
-Loads the sample glTF asset, runs texture checks, and asserts the result is
-valid JSON with the expected structure and no crashes.
+Tests:
+  1. Smoke test: load street_lamp_01.gltf, run check_textures, assert valid structure.
+  2. Programmatic known-bad: create a normal map with wrong colorspace (sRGB),
+     assert the color_space check returns FAIL.
+
+Note: GLB export/import normalises colorspace metadata, so the wrong-colorspace
+known-bad GLB is not usable here. The colorspace violation is created programmatically
+inside Blender (real bpy calls, not mocked).
+
+Both tests skip gracefully if assets/ is missing.
 """
 from __future__ import annotations
 
 import json
-import os
 import sys
+from pathlib import Path
 
-try:
-    import bpy
-except ImportError:
-    print("ERROR: bpy not available — run this script via Blender headless")
-    sys.exit(1)
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
-# Add the project root to sys.path so pipeline imports work.
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, _PROJECT_ROOT)
+ASSETS_DIR = _PROJECT_ROOT / "assets"
+
+import bpy  # noqa: E402
 
 from pipeline.stage1.texture import (  # noqa: E402
     ImageTextureNode,
@@ -34,15 +39,10 @@ from pipeline.stage1.texture import (  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
-# Real bpy wrappers
+# bpy-backed wrappers  (same as before, kept intact)
 # ---------------------------------------------------------------------------
 
-def _get_socket_name(node: "bpy.types.Node") -> str:
-    """Return the downstream socket name for color space inference.
-
-    Follows the first outgoing link from the Color output. Falls back to the
-    image name so color space inference can still use it as a keyword source.
-    """
+def _get_socket_name(node: bpy.types.Node) -> str:
     try:
         links = node.outputs["Color"].links
         if links:
@@ -52,20 +52,18 @@ def _get_socket_name(node: "bpy.types.Node") -> str:
     return node.image.name if node.image else ""
 
 
-def _filepath_is_missing(image: "bpy.types.Image") -> bool:
-    """Return True if image has an external filepath that cannot be resolved."""
+def _filepath_is_missing(image: bpy.types.Image) -> bool:
+    import os
     if not image.filepath:
-        return False  # No filepath: packed or generated — not "missing"
+        return False
     if image.packed_file:
-        return False  # Packed — file is embedded, not external
+        return False
     abs_path = bpy.path.abspath(image.filepath)
     return not os.path.exists(abs_path)
 
 
 class BpyTextureMaterial(TextureMaterial):
-    """Wraps a bpy.types.Material for texture node extraction."""
-
-    def __init__(self, mat: "bpy.types.Material") -> None:
+    def __init__(self, mat: bpy.types.Material) -> None:
         self._mat = mat
 
     @property
@@ -90,9 +88,7 @@ class BpyTextureMaterial(TextureMaterial):
 
 
 class BpyTextureImage(TextureImage):
-    """Wraps a bpy.types.Image for size/depth/colorspace access."""
-
-    def __init__(self, image: "bpy.types.Image") -> None:
+    def __init__(self, image: bpy.types.Image) -> None:
         self._image = image
 
     @property
@@ -113,8 +109,6 @@ class BpyTextureImage(TextureImage):
 
 
 class BpyTextureBlenderContext(TextureBlenderContext):
-    """Reads materials and images from the active Blender scene."""
-
     def materials(self) -> list[TextureMaterial]:
         return [
             BpyTextureMaterial(mat)
@@ -126,71 +120,103 @@ class BpyTextureBlenderContext(TextureBlenderContext):
         return [BpyTextureImage(img) for img in bpy.data.images]
 
 
+def _clear_scene() -> None:
+    bpy.ops.object.select_all(action="SELECT")
+    bpy.ops.object.delete(use_global=False)
+    for block in list(bpy.data.meshes):
+        bpy.data.meshes.remove(block, do_unlink=True)
+    for block in list(bpy.data.materials):
+        bpy.data.materials.remove(block, do_unlink=True)
+    for block in list(bpy.data.images):
+        bpy.data.images.remove(block, do_unlink=True)
+
+
+def _create_wrong_colorspace_scene() -> None:
+    """Create a minimal scene: one mesh with a normal map image set to sRGB (wrong)."""
+    _clear_scene()
+    mesh = bpy.data.meshes.new("test_mesh")
+    obj = bpy.data.objects.new("test_obj", mesh)
+    bpy.context.scene.collection.objects.link(obj)
+    mesh.from_pydata([(0, 0, 0), (1, 0, 0), (0.5, 1, 0)], [], [(0, 1, 2)])
+    mesh.update()
+
+    img = bpy.data.images.new("normal_wrong", width=4, height=4)
+    img.colorspace_settings.name = "sRGB"  # wrong: normal maps must be Non-Color
+
+    mat = bpy.data.materials.new("mat_wrong_colorspace")
+    mat.use_nodes = True
+    nodes = mat.node_tree.nodes
+    links = mat.node_tree.links
+    bsdf = nodes.get("Principled BSDF")
+    tex = nodes.new("ShaderNodeTexImage")
+    tex.image = img
+    nmap = nodes.new("ShaderNodeNormalMap")
+    links.new(tex.outputs["Color"], nmap.inputs["Color"])
+    links.new(nmap.outputs["Normal"], bsdf.inputs["Normal"])
+    obj.data.materials.append(mat)
+
+
+EXPECTED_CHECK_NAMES = {
+    "missing_textures", "resolution_limit", "power_of_two",
+    "texture_count", "channel_depth", "color_space",
+}
+
+
 # ---------------------------------------------------------------------------
-# Test runner
+# Test entry point
 # ---------------------------------------------------------------------------
 
-def main() -> None:
-    sample = os.path.join(
-        _PROJECT_ROOT,
-        "asscheck_uproj",
-        "Assets",
-        "Models",
-        "street_lamp_01_quant.gltf",
-    )
+def run_tests() -> dict:
+    """Run all stage1c texture tests. Returns dict with 'passed' key."""
+    if not ASSETS_DIR.exists():
+        return {"skipped": True, "reason": f"assets dir not found: {ASSETS_DIR}"}
 
-    if os.path.exists(sample):
-        bpy.ops.import_scene.gltf(filepath=sample)
-    else:
-        print(f"WARNING: sample asset not found at {sample} — using default scene")
+    failures: list[str] = []
+    tests_run = 0
 
+    # Smoke test: real asset
+    asset = ASSETS_DIR / "street_lamp_01.gltf"
+    if asset.exists():
+        _clear_scene()
+        bpy.ops.import_scene.gltf(filepath=str(asset))
+        ctx = BpyTextureBlenderContext()
+        result = check_textures(ctx, TextureConfig())
+        tests_run += 1
+
+        if result.name != "texture":
+            failures.append(f"smoke: stage name '{result.name}' != 'texture'")
+        if len(result.checks) != 6:
+            failures.append(f"smoke: expected 6 checks, got {len(result.checks)}")
+        missing = EXPECTED_CHECK_NAMES - {c.name for c in result.checks}
+        if missing:
+            failures.append(f"smoke: missing checks: {missing}")
+        json.loads(json.dumps({
+            "stage": result.name,
+            "checks": [{"name": c.name, "status": c.status.value} for c in result.checks],
+        }))
+
+    # Known-bad: programmatic wrong colorspace (GLB roundtrip loses colorspace info)
+    _create_wrong_colorspace_scene()
     ctx = BpyTextureBlenderContext()
-    config = TextureConfig()
-    result = check_textures(ctx, config)
+    result = check_textures(ctx, TextureConfig())
+    tests_run += 1
 
-    # Serialise to JSON and verify round-trip.
-    stage_dict = {
-        "name": result.name,
-        "status": result.status.value,
-        "checks": [
-            {
-                "name": c.name,
-                "status": c.status.value,
-                "measured_value": c.measured_value,
-                "threshold": c.threshold,
-                "message": c.message,
-            }
-            for c in result.checks
-        ],
-    }
+    check = next((c for c in result.checks if c.name == "color_space"), None)
+    if check is None:
+        failures.append("wrong_colorspace: check 'color_space' not found")
+    elif check.status.value != "FAIL":
+        failures.append(
+            f"wrong_colorspace: expected 'color_space' FAIL, got {check.status.value}"
+        )
 
-    json_str = json.dumps(stage_dict, indent=2)
-    data = json.loads(json_str)  # Verify it round-trips without error.
+    return {"passed": len(failures) == 0, "tests_run": tests_run, "failures": failures}
 
-    assert data["name"] == "texture", (
-        f"Expected stage name 'texture', got '{data['name']}'"
-    )
-    assert len(data["checks"]) == 6, (
-        f"Expected 6 checks, got {len(data['checks'])}"
-    )
 
-    check_names = {c["name"] for c in data["checks"]}
-    expected_names = {
-        "missing_textures",
-        "resolution_limit",
-        "power_of_two",
-        "texture_count",
-        "channel_depth",
-        "color_space",
-    }
-    assert check_names == expected_names, (
-        f"Unexpected check names: {check_names - expected_names}"
-    )
-
-    print(json_str)
-    print("PASS: Stage 1c texture checks integration test passed")
-    sys.exit(0)
+def _main() -> None:
+    r = run_tests()
+    print(json.dumps(r, indent=2))
+    sys.exit(0 if r.get("passed", r.get("skipped", False)) else 1)
 
 
 if __name__ == "__main__":
-    main()
+    _main()

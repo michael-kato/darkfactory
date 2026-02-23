@@ -1,13 +1,13 @@
 """Integration test for Stage 1a geometry checks — runs inside Blender headless.
 
-Usage:
-    blender --background --python blender_tests/test_stage1a_blender.py
+Usage (headless):  blender --background --python blender_tests/test_stage1a_blender.py
+Usage (GUI):       Open in Blender Text Editor, press Alt+R
 
-The script:
-  1. Skips gracefully (exit 0, JSON {"skipped": true}) if the assets dir
-     does not contain street_lamp_01.gltf.
-  2. Imports the asset, runs check_geometry via real bpy / bmesh wrappers.
-  3. Prints the StageResult as a single JSON line and exits 0 on success.
+Tests:
+  1. Smoke test: load street_lamp_01.gltf, run check_geometry, assert valid structure.
+  2. Known-bad GLBs: one per check type, assert the expected check returns FAIL.
+
+Both tests skip gracefully if assets/ is missing.
 """
 from __future__ import annotations
 
@@ -15,23 +15,12 @@ import json
 import sys
 from pathlib import Path
 
-# ---------------------------------------------------------------------------
-# Make the pipeline package importable from within Blender's Python
-# ---------------------------------------------------------------------------
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 ASSETS_DIR = _PROJECT_ROOT / "assets"
-ASSET_PATH = ASSETS_DIR / "street_lamp_01.gltf"
 
-if not ASSET_PATH.exists():
-    print(json.dumps({"skipped": True, "reason": f"asset not found: {ASSET_PATH}"}))
-    sys.exit(0)
-
-# ---------------------------------------------------------------------------
-# Blender / bmesh imports (only available inside Blender)
-# ---------------------------------------------------------------------------
 import bpy  # noqa: E402
 import bmesh as _bmesh  # noqa: E402
 
@@ -44,12 +33,10 @@ from pipeline.stage1.geometry import (  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
-# Concrete bpy-backed implementations
+# bpy-backed wrappers
 # ---------------------------------------------------------------------------
 
 class BpyMeshObject(MeshObject):
-    """Wraps a single bpy mesh object."""
-
     def __init__(self, obj: bpy.types.Object) -> None:
         self._obj = obj
 
@@ -58,7 +45,6 @@ class BpyMeshObject(MeshObject):
         return self._obj.name
 
     def triangle_count(self) -> int:
-        # Count triangles without modifying the stored mesh.
         return sum(len(p.vertices) - 2 for p in self._obj.data.polygons)
 
     def bmesh_get(self):
@@ -68,8 +54,6 @@ class BpyMeshObject(MeshObject):
 
 
 class BpyBlenderContext(BlenderContext):
-    """Wraps the active Blender scene."""
-
     def mesh_objects(self) -> list[BpyMeshObject]:
         return [
             BpyMeshObject(obj)
@@ -78,44 +62,89 @@ class BpyBlenderContext(BlenderContext):
         ]
 
 
-# ---------------------------------------------------------------------------
-# Test body
-# ---------------------------------------------------------------------------
-
-def run() -> None:
-    # Clear default scene objects
+def _clear_scene() -> None:
     bpy.ops.object.select_all(action="SELECT")
-    bpy.ops.object.delete()
+    bpy.ops.object.delete(use_global=False)
+    for block in list(bpy.data.meshes):
+        bpy.data.meshes.remove(block, do_unlink=True)
+    for block in list(bpy.data.materials):
+        bpy.data.materials.remove(block, do_unlink=True)
+    for block in list(bpy.data.images):
+        bpy.data.images.remove(block, do_unlink=True)
 
-    # Import the glTF asset
-    bpy.ops.import_scene.gltf(filepath=str(ASSET_PATH))
 
-    ctx = BpyBlenderContext()
-    objects = ctx.mesh_objects()
-    assert len(objects) > 0, "No mesh objects found after import"
+# (filename in assets/known-bad/, check name expected to FAIL)
+KNOWN_BAD_CASES = [
+    ("non_manifold.glb",     "non_manifold"),
+    ("degenerate_faces.glb", "degenerate_faces"),
+    ("flipped_normals.glb",  "normal_consistency"),
+    ("loose_geometry.glb",   "loose_geometry"),
+    ("overbudget_tris.glb",  "polycount_budget"),
+    ("underbudget_tris.glb", "polycount_budget"),
+]
 
-    config = GeometryConfig(category="env_prop")
-    result = check_geometry(ctx, config)
 
-    assert result.name == "geometry", f"Unexpected stage name: {result.name}"
-    assert len(result.checks) == 6, f"Expected 6 checks, got {len(result.checks)}"
+# ---------------------------------------------------------------------------
+# Test entry point
+# ---------------------------------------------------------------------------
 
-    # Serialise to confirm valid JSON round-trip
-    output = {
-        "stage": result.name,
-        "status": result.status.value,
-        "checks": [
-            {
-                "name": c.name,
-                "status": c.status.value,
-                "measured_value": c.measured_value,
-                "threshold": c.threshold,
-            }
-            for c in result.checks
-        ],
-    }
-    print(json.dumps(output))
+def run_tests() -> dict:
+    """Run all stage1a geometry tests. Returns dict with 'passed' key."""
+    if not ASSETS_DIR.exists():
+        return {"skipped": True, "reason": f"assets dir not found: {ASSETS_DIR}"}
+
+    failures: list[str] = []
+    tests_run = 0
+
+    # Smoke test: real asset — no crash, valid result structure
+    asset = ASSETS_DIR / "street_lamp_01.gltf"
+    if asset.exists():
+        _clear_scene()
+        bpy.ops.import_scene.gltf(filepath=str(asset))
+        ctx = BpyBlenderContext()
+        assert len(ctx.mesh_objects()) > 0, "No mesh objects after import"
+        result = check_geometry(ctx, GeometryConfig(category="env_prop"))
+        tests_run += 1
+
+        if result.name != "geometry":
+            failures.append(f"smoke: stage name '{result.name}' != 'geometry'")
+        if len(result.checks) != 6:
+            failures.append(f"smoke: expected 6 checks, got {len(result.checks)}")
+        json.loads(json.dumps({
+            "stage": result.name,
+            "status": result.status.value,
+            "checks": [{"name": c.name, "status": c.status.value} for c in result.checks],
+        }))
+
+    # Known-bad: each GLB should trigger exactly the stated check failure
+    bad_dir = ASSETS_DIR / "known-bad"
+    if bad_dir.exists():
+        for filename, check_name in KNOWN_BAD_CASES:
+            glb = bad_dir / filename
+            if not glb.exists():
+                continue
+            _clear_scene()
+            bpy.ops.import_scene.gltf(filepath=str(glb))
+            ctx = BpyBlenderContext()
+            result = check_geometry(ctx, GeometryConfig(category="env_prop"))
+            tests_run += 1
+
+            check = next((c for c in result.checks if c.name == check_name), None)
+            if check is None:
+                failures.append(f"{filename}: check '{check_name}' not found")
+            elif check.status.value != "FAIL":
+                failures.append(
+                    f"{filename}: expected '{check_name}' FAIL, got {check.status.value}"
+                )
+
+    return {"passed": len(failures) == 0, "tests_run": tests_run, "failures": failures}
+
+
+def _main() -> None:
+    r = run_tests()
+    print(json.dumps(r, indent=2))
+    sys.exit(0 if r.get("passed", r.get("skipped", False)) else 1)
 
 
 if __name__ == "__main__":
-    run()
+    _main()
