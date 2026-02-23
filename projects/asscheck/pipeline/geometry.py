@@ -1,4 +1,4 @@
-"""Stage 1a — Geometry Checks.
+"""Geometry Checks.
 
 Analyses mesh geometry using bmesh to detect polycount violations,
 non-manifold conditions, degenerate faces, normal inconsistencies,

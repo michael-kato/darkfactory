@@ -1,4 +1,4 @@
-"""Stage 0 — Intake & Triage.
+"""Intake & Triage.
 
 File-system-level validation that runs before Blender opens anything.
 Validates format, checks size, assigns a unique asset ID, logs metadata,
@@ -147,14 +147,14 @@ def _build_report(
 
 
 # ---------------------------------------------------------------------------
-# CLI entry point:  python -m pipeline.stage0.intake <file> --source ... etc.
+# CLI entry point:  python -m pipeline.intake <file> --source ... etc.
 # ---------------------------------------------------------------------------
 
 def _parse_args(argv: list[str] | None = None):
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Stage 0: Intake & Triage — filesystem-level asset validation"
+        description="Intake & Triage — filesystem-level asset validation"
     )
     parser.add_argument("file", help="Path to the asset file")
     parser.add_argument("--source", required=True, help="Asset source (e.g. vendor/marketplace/internal)")

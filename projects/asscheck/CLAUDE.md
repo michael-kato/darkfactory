@@ -19,26 +19,23 @@ projects/asscheck/
   pipeline/           Python QA pipeline package (importable without Blender)
     schema.py         Core types: QaReport, StageResult, CheckResult, enums
     report_builder.py Utility for assembling the final QA report
-    stage0/
-      intake.py       run_intake(config) -> QaReport  (file validation, asset ID)
-    stage1/
-      geometry.py     check_geometry(ctx, config) -> StageResult
-      uv.py           check_uvs(ctx, config) -> StageResult
-      texture.py      check_textures(ctx, config) -> StageResult
-      pbr.py          check_pbr(ctx, config) -> StageResult
-      armature.py     check_armature(ctx, config) -> StageResult
-      scene.py        check_scene(ctx, config) -> StageResult
-      blender_runner.py  run_in_blender(script, args) -> dict  (subprocess helper)
-    stage2/
-      remediate.py    auto-fix geometry issues
-    stage3/
-      export.py       export-and-handoff logic
-    stage5/
-      turntable.py    render turntable images
-      ssim_diff.py    perceptual diff between renders
-      summary.py      final QA summary report
-  tests/              pytest unit tests — no Blender, use mock BlenderContext
-  blender_tests/      Integration tests: blender --background --python <script>.py
+    main.py           Orchestrator: run_checks() ties all stages together
+    intake.py         run_intake(config) -> QaReport  (file validation, asset ID)
+    geometry.py       check_geometry(ctx, config) -> StageResult
+    uv.py             check_uvs(ctx, config) -> StageResult
+    texture.py        check_textures(ctx, config) -> StageResult
+    pbr.py            check_pbr(ctx, config) -> StageResult
+    armature.py       check_armature(ctx, config) -> StageResult
+    scene.py          check_scene(ctx, config) -> StageResult
+    blender_runner.py run_in_blender(script, args) -> dict  (subprocess helper)
+    remediate.py      auto-fix geometry issues
+    export.py         export-and-handoff logic
+    turntable.py      render turntable images
+    ssim_diff.py      perceptual diff between renders
+    summary.py        final QA summary report
+  tests/              pytest unit tests (schema + intake only, no Blender)
+  blender_tests/
+    tests.py          All integration tests in one file — run inside Blender
   tools/
     generate_test_assets.py   Procedurally generates known-bad GLBs via Blender bpy
   assets/             GITIGNORED — real binary assets (gltf, glb, fbx, obj, textures)
@@ -93,57 +90,52 @@ Design rules for known-bad assets:
 ## Test Strategy
 
 ### Pure Python Tests (`tests/`) — schema and intake only
-Tests for `pipeline/schema.py` (serialization) and `pipeline/stage0/intake.py`
+Tests for `pipeline/schema.py` (serialization) and `pipeline/intake.py`
 (file format/size logic). No Blender dependency. Fast.
 Run with: `python -m pytest tests/ -v`
 
-### Integration Tests (`blender_tests/`) — primary test gate
+### Integration Tests (`blender_tests/tests.py`) — primary test gate
 Real Blender runs against real assets and known-bad GLBs. These are the authoritative
-tests for all Stage 1+ pipeline logic. The `blender_tests/run_all.py` entry point
-runs every stage test in a single Blender process.
+tests for all Stage 1+ pipeline logic. All stage tests live in a single file.
 
-Each test script exports `run_tests() -> dict` so it can be:
-- Run standalone: `blender --background --python blender_tests/test_stage1a_blender.py`
-- Run all at once: `blender --background --python blender_tests/run_all.py`
-- Run interactively: open in Blender Text Editor, press `Alt+R`
+Can be run as:
+- Headless: `blender --background --python blender_tests/tests.py`
+- GUI: open `blender_tests/tests.py` in Blender Text Editor → `Alt+R`
 
-Test files skip gracefully if `assets/` is missing.
+Test functions skip gracefully if `assets/` is missing.
 
 ### Running Tests
 ```bash
-# Full test suite (runs everything: pytest + blender integration)
+# Full test suite (pytest + blender integration)
 ./test.sh
 
 # Quick pure-Python only (no Blender)
 source .venv/bin/activate && python -m pytest tests/ -v
 
 # Blender integration only
-/opt/blender-5.0.1-linux-x64/blender --background --python blender_tests/run_all.py
-
-# Single stage
-/opt/blender-5.0.1-linux-x64/blender --background --python blender_tests/test_stage1a_blender.py
+/opt/blender-5.0.1-linux-x64/blender --background --python blender_tests/tests.py
 
 # GUI (interactive, no process spawn — for development iteration)
-# Open run_all.py or any test script in Blender Text Editor → Alt+R
+# Open blender_tests/tests.py in Blender Text Editor → Alt+R
 ```
 
 ## Pipeline Stages & Status
 
 | Stage | Module | Status | Notes |
 |---|---|---|---|
-| 0-intake | `pipeline/stage0/intake.py` | Built | Format, size, asset ID |
+| 0-intake | `pipeline/intake.py` | Built | Format, size, asset ID |
 | 0-schema | `pipeline/schema.py` | Built | Core types |
-| 1a-geometry | `pipeline/stage1/geometry.py` | Built | polycount, non_manifold, degenerate, normals, loose |
-| 1b-uv | `pipeline/stage1/uv.py` | Built | missing uvs, bounds, overlap |
-| 1c-texture | `pipeline/stage1/texture.py` | Built | resolution, format, colorspace |
-| 1d-pbr | `pipeline/stage1/pbr.py` | Built | PBR workflow validation |
-| 1e-armature | `pipeline/stage1/armature.py` | Built | Skeleton checks |
-| 1f-scene | `pipeline/stage1/scene.py` | Built | Hierarchy and naming |
-| 2-remediation | `pipeline/stage2/remediate.py` | Built | Auto-fix geometry |
-| 3-export | `pipeline/stage3/export.py` | Built | Handoff packaging |
+| 1a-geometry | `pipeline/geometry.py` | Built | polycount, non_manifold, degenerate, normals, loose |
+| 1b-uv | `pipeline/uv.py` | Built | missing uvs, bounds, overlap |
+| 1c-texture | `pipeline/texture.py` | Built | resolution, format, colorspace |
+| 1d-pbr | `pipeline/pbr.py` | Built | PBR workflow validation |
+| 1e-armature | `pipeline/armature.py` | Built | Skeleton checks |
+| 1f-scene | `pipeline/scene.py` | Built | Hierarchy and naming |
+| 2-remediation | `pipeline/remediate.py` | Built | Auto-fix geometry |
+| 3-export | `pipeline/export.py` | Built | Handoff packaging |
 | 4a-unity-import | `asscheck_uproj/Assets/Editor/` | Spec only | Unity-side import config |
 | 4b-unity-runtime | `asscheck_uproj/Assets/Editor/` | Spec only | Runtime validation |
-| 5-visual | `pipeline/stage5/` | Built | Turntable render + SSIM |
+| 5-visual | `pipeline/turntable.py`, `pipeline/ssim_diff.py`, `pipeline/summary.py` | Built | Turntable render + SSIM |
 
 ## Automated Commit Format
 - Subject: `[automated] asscheck: <description>`

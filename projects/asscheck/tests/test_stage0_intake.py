@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from pipeline.schema import CheckStatus, StageStatus
-from pipeline.stage0.intake import IntakeConfig, run_intake
+from pipeline.intake import IntakeConfig, run_intake
 
 ASSETS_DIR = Path(__file__).parent.parent / "assets"
 

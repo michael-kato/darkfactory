@@ -1,4 +1,4 @@
-"""Stage 2 — Auto-Remediation.
+"""Auto-Remediation.
 
 Applies four deterministic auto-fix actions based on Stage 1 check results.
 Every change is logged as a ``FixEntry`` with before/after values.  Issues

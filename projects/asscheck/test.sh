@@ -33,4 +33,4 @@ if [[ ! -f "$BLENDER" ]]; then
 fi
 
 echo "[asscheck] running blender integration tests..."
-exec "$BLENDER" --background --python blender_tests/run_all.py
+exec "$BLENDER" --background --python blender_tests/tests.py

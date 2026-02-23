@@ -1,4 +1,4 @@
-"""Stage 1c — Texture Checks.
+"""Texture Checks.
 
 Validates all textures referenced by materials in the Blender scene:
 resolution limits, power-of-two dimensions, missing references, texture

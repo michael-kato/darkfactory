@@ -1,4 +1,4 @@
-"""Stage 1f — Scene & Hierarchy Checks + Performance Estimates.
+"""Scene & Hierarchy Checks + Performance Estimates.
 
 Validates scene-level conventions: object naming, orphan data, LOD and
 collision mesh presence.  Computes performance estimates (draw calls, VRAM,

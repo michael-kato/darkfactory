@@ -1,4 +1,4 @@
-"""Stage 1e — Armature & Rig Checks.
+"""Armature & Rig Checks.
 
 Validates armature and skinning data: bone count budgets, naming conventions,
 vertex weight validity, and bone hierarchy integrity.

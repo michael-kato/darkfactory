@@ -1,4 +1,4 @@
-"""Stage 1b — UV Checks.
+"""UV Checks.
 
 Analyses UV layouts for all mesh objects in the Blender scene: detects missing
 UVs, out-of-bounds islands, overlapping islands, texel density violations, and

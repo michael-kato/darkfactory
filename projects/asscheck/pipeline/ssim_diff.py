@@ -1,4 +1,4 @@
-"""Stage 5 — SSIM Perceptual Diff.
+"""SSIM Perceptual Diff.
 
 Compares new turntable renders against golden reference images using
 structural similarity (SSIM). Flagged renders are marked for human review.

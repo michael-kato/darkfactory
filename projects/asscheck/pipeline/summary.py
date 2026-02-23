@@ -1,4 +1,4 @@
-"""Stage 5 — QA Output Summary.
+"""QA Output Summary.
 
 Assembles a self-contained HTML review package from turntable renders, SSIM
 results, the scale reference screenshot, and the QA report.  All images are
@@ -20,7 +20,7 @@ from pipeline.schema import (
 )
 
 if TYPE_CHECKING:
-    from pipeline.stage5.ssim_diff import SSIMResult
+    from pipeline.ssim_diff import SSIMResult
 
 
 # ---------------------------------------------------------------------------

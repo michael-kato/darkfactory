@@ -1,4 +1,4 @@
-"""Stage 3 — Export & Handoff.
+"""Export & Handoff.
 
 Exports the remediated Blender scene as FBX or glTF with Unity-compatible
 settings, writes the JSON sidecar manifest, and routes output files to the

@@ -1,4 +1,4 @@
-"""Stage 5 — Blender Turntable Renderer.
+"""Blender Turntable Renderer.
 
 Renders an asset from evenly-spaced azimuth angles using Blender's render
 engine (EEVEE or CYCLES) to produce a set of turntable PNG images for visual
@@ -7,7 +7,7 @@ QA review.
 This module **must be run inside Blender** (``bpy`` is required).  It can be
 used as a library from within Blender Python or invoked as a CLI script:
 
-    blender --background --python pipeline/stage5/turntable.py -- \\
+    blender --background --python pipeline/turntable.py -- \\
         <asset_path> <output_dir>
 
 All pure-Python types (``TurntableConfig``, ``render_turntable`` signature)
@@ -284,7 +284,7 @@ if __name__ == "__main__":
     custom_args = argv[argv.index("--") + 1:] if "--" in argv else []
     if len(custom_args) < 2:
         print(
-            "Usage: blender --background --python pipeline/stage5/turntable.py"
+            "Usage: blender --background --python pipeline/turntable.py"
             " -- <asset_path> <output_dir> [num_angles]",
             file=sys.stderr,
         )

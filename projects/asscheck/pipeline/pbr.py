@@ -1,4 +1,4 @@
-"""Stage 1d — PBR Material Validation.
+"""PBR Material Validation.
 
 Validates PBR material compliance: workflow type, albedo/metalness/roughness
 value ranges, normal map validity, material slot count, and Principled BSDF
