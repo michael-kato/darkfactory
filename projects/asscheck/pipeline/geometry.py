@@ -6,10 +6,9 @@ loose geometry, and interior faces.
 """
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from pipeline.schema import CheckResult, CheckStatus, StageResult, StageStatus
+from pipeline.schema import CheckResult, StageResult, Status
 
 # ---------------------------------------------------------------------------
 # Default triangle budgets per asset category
@@ -47,44 +46,11 @@ class GeometryConfig:
 
 
 # ---------------------------------------------------------------------------
-# Abstractions (bpy implementations in blender_tests/tests.py)
-# ---------------------------------------------------------------------------
-
-class MeshObject(ABC):
-    """A single mesh object in the scene."""
-
-    @property
-    @abstractmethod
-    def name(self): ...
-
-    @abstractmethod
-    def triangle_count(self):
-        """Return the total number of triangles in this object."""
-        ...
-
-    @abstractmethod
-    def bmesh_get(self):
-        """Return a ``bmesh.types.BMesh`` for this object.
-
-        The caller must not free/release the returned object; the concrete
-        implementation manages its lifetime.
-        """
-        ...
-
-
-class BlenderContext(ABC):
-    """Access to the loaded Blender scene."""
-
-    @abstractmethod
-    def mesh_objects(self) -> list[MeshObject]: ...
-
-
-# ---------------------------------------------------------------------------
 # Individual check helpers
 # ---------------------------------------------------------------------------
 
 def _check_polycount(
-    mesh_objects: list[MeshObject],
+    mesh_objects: list,
     config: GeometryConfig,
 ) -> CheckResult:
     total = sum(obj.triangle_count() for obj in mesh_objects)
@@ -96,8 +62,8 @@ def _check_polycount(
     if total < min_tris or total > max_tris:
         return CheckResult(
             name="polycount_budget",
-            status=CheckStatus.FAIL,
-            measured_value=total,
+            status=Status.FAIL,
+            value=total,
             threshold=max_tris,
             message=(
                 f"Triangle count {total} outside budget "
@@ -106,8 +72,8 @@ def _check_polycount(
         )
     return CheckResult(
         name="polycount_budget",
-        status=CheckStatus.PASS,
-        measured_value=total,
+        status=Status.PASS,
+        value=total,
         threshold=max_tris,
         message=f"Triangle count {total} within budget ({min_tris}, {max_tris})",
     )
@@ -117,8 +83,8 @@ def _check_non_manifold(all_bm) -> CheckResult:
     count = sum(1 for bm in all_bm for e in bm.edges if not e.is_manifold)
     return CheckResult(
         name="non_manifold",
-        status=CheckStatus.FAIL if count > 0 else CheckStatus.PASS,
-        measured_value=count,
+        status=Status.FAIL if count > 0 else Status.PASS,
+        value=count,
         threshold=0,
         message=(
             f"{count} non-manifold edge(s) found"
@@ -131,8 +97,8 @@ def _check_degenerate_faces(all_bm) -> CheckResult:
     count = sum(1 for bm in all_bm for f in bm.faces if f.calc_area() < 1e-6)
     return CheckResult(
         name="degenerate_faces",
-        status=CheckStatus.FAIL if count > 0 else CheckStatus.PASS,
-        measured_value=count,
+        status=Status.FAIL if count > 0 else Status.PASS,
+        value=count,
         threshold=0,
         message=(
             f"{count} degenerate face(s) found (area < 1e-6)"
@@ -178,8 +144,8 @@ def _check_normal_consistency(all_bm) -> CheckResult:
     count = len(inconsistent)
     return CheckResult(
         name="normal_consistency",
-        status=CheckStatus.FAIL if count > 0 else CheckStatus.PASS,
-        measured_value=count,
+        status=Status.FAIL if count > 0 else Status.PASS,
+        value=count,
         threshold=0,
         message=(
             f"{count} face(s) with inconsistent normals"
@@ -196,8 +162,8 @@ def _check_loose_geometry(all_bm) -> CheckResult:
         count += sum(1 for e in bm.edges if len(e.link_faces) == 0)
     return CheckResult(
         name="loose_geometry",
-        status=CheckStatus.FAIL if count > 0 else CheckStatus.PASS,
-        measured_value=count,
+        status=Status.FAIL if count > 0 else Status.PASS,
+        value=count,
         threshold=0,
         message=(
             f"{count} loose vertex/edge element(s) found"
@@ -221,8 +187,8 @@ def _check_interior_faces(all_bm) -> CheckResult:
                 count += 1
     return CheckResult(
         name="interior_faces",
-        status=CheckStatus.FAIL if count > 0 else CheckStatus.PASS,
-        measured_value=count,
+        status=Status.FAIL if count > 0 else Status.PASS,
+        value=count,
         threshold=0,
         message=(
             f"{count} potential interior face(s) found"
@@ -235,7 +201,7 @@ def _check_interior_faces(all_bm) -> CheckResult:
 # Public entry point
 # ---------------------------------------------------------------------------
 
-def check_geometry(context: BlenderContext, config: GeometryConfig) -> StageResult:
+def check_geometry(context, config: GeometryConfig) -> StageResult:
     """Run all geometry checks and return a ``StageResult``.
 
     All six checks always run — earlier failures do not short-circuit later
@@ -254,8 +220,8 @@ def check_geometry(context: BlenderContext, config: GeometryConfig) -> StageResu
     ]
 
     stage_status = (
-        StageStatus.FAIL
-        if any(c.status == CheckStatus.FAIL for c in checks)
-        else StageStatus.PASS
+        Status.FAIL
+        if any(c.status == Status.FAIL for c in checks)
+        else Status.PASS
     )
     return StageResult(name="geometry", status=stage_status, checks=checks)

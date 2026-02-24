@@ -1,38 +1,17 @@
-"""QA Output Summary.
-
-Assembles a self-contained HTML review package from turntable renders, SSIM
-results, the scale reference screenshot, and the QA report.  All images are
-copied into a single ``{output_dir}/{asset_id}/`` folder alongside the HTML.
-"""
-from __future__ import annotations
-
+"""QA Output Summary."""
 import os
 import shutil
 from html import escape
-from typing import TYPE_CHECKING
 
-from pipeline.schema import (
-    QaReport,
-    ReviewFlag,
-    Severity,
-    StageResult,
-    StageStatus,
-)
+from pipeline.schema import ReviewFlag, Status
 
-if TYPE_CHECKING:
-    from pipeline.ssim_diff import SSIMResult
-
-
-# ---------------------------------------------------------------------------
-# HTML generation
-# ---------------------------------------------------------------------------
 
 def _img_tag(src, alt="", style=""):
     s = f' style="{escape(style)}"' if style else ""
     return f'<img src="{escape(src)}" alt="{escape(alt)}"{s}>'
 
 
-def _flag_row(flag: ReviewFlag):
+def _flag_row(flag):
     colour = {"ERROR": "#c0392b", "WARNING": "#e67e22", "INFO": "#2980b9"}
     bg = colour.get(flag.severity.value, "#555")
     badge = (
@@ -46,17 +25,8 @@ def _flag_row(flag: ReviewFlag):
     )
 
 
-def _build_html(
-    report: QaReport,
-    asset_id,
-    render_basenames,
-    scale_basename,
-    ssim_results: list["SSIMResult"],
-    diff_basenames,
-    all_flags: list[ReviewFlag],
-):
-    meta = report.metadata
-    status = report.overall_status.value
+def _build_html(report, asset_id, render_basenames, scale_basename, ssim_results, diff_basenames, all_flags):
+    status = report.status.value
 
     status_colour = {
         "PASS": "#27ae60",
@@ -65,7 +35,6 @@ def _build_html(
         "FAIL": "#c0392b",
     }.get(status, "#555")
 
-    # --- Turntable render grid ---
     render_cells = "".join(
         f'<td style="padding:4px;text-align:center">'
         f'{_img_tag(b, alt=b, style="max-width:200px;max-height:200px;border:1px solid #ddd")}'
@@ -79,7 +48,6 @@ def _build_html(
         else "<h2>Turntable Renders</h2><p>No renders available.</p>"
     )
 
-    # --- Scale reference ---
     if scale_basename:
         scale_section = (
             f"<h2>Scale Reference</h2>"
@@ -88,7 +56,6 @@ def _build_html(
     else:
         scale_section = "<h2>Scale Reference</h2><p>Not available.</p>"
 
-    # --- SSIM diff images ---
     if diff_basenames:
         diff_cells = "".join(
             f'<td style="padding:4px;text-align:center">'
@@ -100,14 +67,13 @@ def _build_html(
     else:
         diffs_section = ""
 
-    # --- SSIM score table ---
     if ssim_results:
         score_rows = "".join(
             f"<tr>"
-            f"<td>{r.angle}&deg;</td>"
-            f"<td>{r.score:.4f}</td>"
-            f'<td style="color:{"#c0392b" if r.flagged else "#27ae60"}">'
-            f'{"&#x26A0; FLAGGED" if r.flagged else "OK"}</td>'
+            f"<td>{r['angle']}&deg;</td>"
+            f"<td>{r['score']:.4f}</td>"
+            f'<td style="color:{"#c0392b" if r["flagged"] else "#27ae60"}">'
+            f'{"&#x26A0; FLAGGED" if r["flagged"] else "OK"}</td>'
             f"</tr>"
             for r in ssim_results
         )
@@ -119,7 +85,6 @@ def _build_html(
     else:
         ssim_section = ""
 
-    # --- Review flags ---
     if all_flags:
         flag_rows = "".join(_flag_row(f) for f in all_flags)
         flags_section = (
@@ -153,12 +118,12 @@ def _build_html(
 
 <h2>Asset Metadata</h2>
 <dl>
-  <dt>Asset ID</dt><dd>{escape(meta.asset_id)}</dd>
-  <dt>Source</dt><dd>{escape(meta.source)}</dd>
-  <dt>Category</dt><dd>{escape(meta.category)}</dd>
-  <dt>Submitter</dt><dd>{escape(meta.submitter)}</dd>
-  <dt>Submission Date</dt><dd>{escape(meta.submission_date)}</dd>
-  <dt>Processing Time</dt><dd>{escape(meta.processing_timestamp)}</dd>
+  <dt>Asset ID</dt><dd>{escape(report.asset_id)}</dd>
+  <dt>Source</dt><dd>{escape(report.source)}</dd>
+  <dt>Category</dt><dd>{escape(report.category)}</dd>
+  <dt>Submitter</dt><dd>{escape(report.submitter)}</dd>
+  <dt>Submission Date</dt><dd>{escape(report.submitted)}</dd>
+  <dt>Processing Time</dt><dd>{escape(report.processed)}</dd>
 </dl>
 
 {renders_section}
@@ -171,45 +136,11 @@ def _build_html(
 """
 
 
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
-
-def write_review_package(
-    report: QaReport,
-    render_paths,
-    ssim_results: "list[SSIMResult]",
-    scale_image,
-    output_dir,
-):
-    """Assemble a review package for human inspection.
-
-    Copies all render images into ``{output_dir}/{asset_id}/`` and writes
-    ``review_summary.html`` alongside them.  Also appends a
-    ``visual_verification`` :class:`~pipeline.schema.StageResult` (containing
-    the mandatory scale-verification :class:`~pipeline.schema.ReviewFlag`) to
-    *report*.
-
-    Parameters
-    ----------
-    report:
-        The QA report for this asset (mutated in-place with a new stage).
-    render_paths:
-        Paths to turntable render PNGs to include in the package.
-    ssim_results:
-        SSIM comparison results (may be empty).
-    scale_image:
-        Path to the scale-reference screenshot (may be empty string or
-        a non-existent path — the flag is still added).
-    output_dir:
-        Root output directory; a sub-folder named after the asset_id is
-        created inside it.
-    """
-    asset_id = report.metadata.asset_id
+def write_review_package(report, render_paths, ssim_results, scale_image, output_dir):
+    asset_id = report.asset_id
     package_dir = os.path.join(output_dir, asset_id)
     os.makedirs(package_dir, exist_ok=True)
 
-    # --- Copy turntable renders ---
     render_basenames = []
     for render_path in render_paths:
         if os.path.exists(render_path):
@@ -217,43 +148,36 @@ def write_review_package(
             shutil.copy2(render_path, os.path.join(package_dir, bn))
             render_basenames.append(bn)
 
-    # --- Copy SSIM diff images ---
     diff_basenames = []
     for r in ssim_results:
-        if r.diff_image_path and os.path.exists(r.diff_image_path):
-            bn = os.path.basename(r.diff_image_path)
-            shutil.copy2(r.diff_image_path, os.path.join(package_dir, bn))
+        if r["diff_image_path"] and os.path.exists(r["diff_image_path"]):
+            bn = os.path.basename(r["diff_image_path"])
+            shutil.copy2(r["diff_image_path"], os.path.join(package_dir, bn))
             diff_basenames.append(bn)
 
-    # --- Copy scale reference ---
     scale_basename = None
     if scale_image and os.path.exists(scale_image):
         scale_basename = os.path.basename(scale_image)
         shutil.copy2(scale_image, os.path.join(package_dir, scale_basename))
 
-    # --- Add scale-verification ReviewFlag to the report ---
-    stage5 = StageResult(
-        name="visual_verification",
-        status=StageStatus.PASS,
-        review_flags=[
-            ReviewFlag(
-                issue="scale_verification",
-                severity=Severity.INFO,
-                description=(
-                    "Scale reference screenshot generated. "
-                    "Human reviewer must verify scale is correct."
-                ),
-            )
-        ],
-    )
-    report.stages.append(stage5)
+    stage5_flags = [ReviewFlag(
+        issue="scale_verification",
+        severity=Status.INFO,
+        description="Scale reference screenshot generated. Human reviewer must verify scale is correct.",
+    )]
+    # Append a pseudo-stage for visual verification flags
+    report.stages.append(type('_Stage', (), {
+        'name': 'visual_verification',
+        'status': Status.PASS,
+        'checks': [],
+        'fixes': [],
+        'flags': stage5_flags,
+    })())
 
-    # --- Collect all flags for the HTML ---
-    all_flags: list[ReviewFlag] = []
+    all_flags = []
     for stage in report.stages:
-        all_flags.extend(stage.review_flags)
+        all_flags.extend(stage.flags)
 
-    # --- Build and write HTML ---
     html = _build_html(
         report=report,
         asset_id=asset_id,

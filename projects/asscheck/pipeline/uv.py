@@ -7,11 +7,9 @@ lightmap UV2 issues.
 """
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from pipeline.schema import CheckResult, CheckStatus, StageResult, StageStatus
-
+from pipeline.schema import CheckResult, StageResult, Status
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -40,56 +38,8 @@ class UVConfig:
     uv_layer_name: str = "UVMap"
     lightmap_layer_name: str = "UVMap2"
 
-
-# ---------------------------------------------------------------------------
-# Abstractions (bpy implementations in blender_tests/tests.py)
-# ---------------------------------------------------------------------------
-
-class UVMeshObject(ABC):
-    """A single mesh object with UV channel access."""
-
-    @property
-    @abstractmethod
-    def name(self): ...
-
-    @abstractmethod
-    def uv_layer_names(self):
-        """Return all UV layer names present on this mesh."""
-        ...
-
-    @abstractmethod
-    def uv_loops(self, layer_name):
-        """Return all (u, v) loop coordinates for the named UV layer."""
-        ...
-
-    @abstractmethod
-    def uv_triangles(self, layer_name):
-        """Return UV triangles for the named layer as ((u0,v0),(u1,v1),(u2,v2)).
-
-        Used for overlap detection and texel-density computation.
-        """
-        ...
-
-    @abstractmethod
-    def world_surface_area(self):
-        """Return total surface area of this mesh in world-space m²."""
-        ...
-
-
-class UVBlenderContext(ABC):
-    """Access to the loaded scene for UV checking."""
-
-    @abstractmethod
-    def mesh_objects(self) -> list[UVMeshObject]: ...
-
-
-# ---------------------------------------------------------------------------
-# 2-D geometry helpers
-# ---------------------------------------------------------------------------
-
 def _cross_2d(o, a, b):
     return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
-
 
 def _segments_intersect(a0, a1, b0, b1):
     """Return True if segments a0-a1 and b0-b1 properly intersect."""
@@ -102,7 +52,6 @@ def _segments_intersect(a0, a1, b0, b1):
         and ((d3 > 0 and d4 < 0) or (d3 < 0 and d4 > 0))
     )
 
-
 def _point_in_triangle(p, t0, t1, t2):
     """Return True if point p lies inside (or on the boundary of) triangle t0-t1-t2."""
     d0 = _cross_2d(t0, t1, p)
@@ -111,7 +60,6 @@ def _point_in_triangle(p, t0, t1, t2):
     has_neg = (d0 < 0) or (d1 < 0) or (d2 < 0)
     has_pos = (d0 > 0) or (d1 > 0) or (d2 > 0)
     return not (has_neg and has_pos)
-
 
 def _triangles_overlap(t1, t2):
     """Exact 2-D triangle-triangle overlap test.
@@ -138,20 +86,16 @@ def _triangles_overlap(t1, t2):
 
     return False
 
-
 def _triangle_aabb(tri):
     xs = (tri[0][0], tri[1][0], tri[2][0])
     ys = (tri[0][1], tri[1][1], tri[2][1])
     return min(xs), min(ys), max(xs), max(ys)
 
-
 def _triangle_area_2d(tri):
     (x0, y0), (x1, y1), (x2, y2) = tri
     return abs((x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0)) / 2.0
 
-
 _GRID = 16  # spatial-hash grid resolution
-
 
 def _find_overlapping_pairs(triangles):
     """Return the count of overlapping triangle pairs using spatial hashing."""
@@ -187,20 +131,19 @@ def _find_overlapping_pairs(triangles):
 
     return overlap_count
 
-
 # ---------------------------------------------------------------------------
 # Individual check helpers
 # ---------------------------------------------------------------------------
 
 def _check_missing_uvs(
-    objects: list[UVMeshObject],
+    objects: list,
     config: UVConfig,
 ) -> CheckResult:
     count = sum(1 for obj in objects if len(obj.uv_layer_names()) == 0)
     return CheckResult(
         name="missing_uvs",
-        status=CheckStatus.FAIL if count > 0 else CheckStatus.PASS,
-        measured_value=count,
+        status=Status.FAIL if count > 0 else Status.PASS,
+        value=count,
         threshold=0,
         message=(
             f"{count} mesh object(s) have no UV layers"
@@ -208,9 +151,8 @@ def _check_missing_uvs(
         ),
     )
 
-
 def _check_uv_bounds(
-    objects: list[UVMeshObject],
+    objects: list,
     config: UVConfig,
 ) -> CheckResult:
     count = 0
@@ -222,8 +164,8 @@ def _check_uv_bounds(
                 count += 1
     return CheckResult(
         name="uv_bounds",
-        status=CheckStatus.FAIL if count > 0 else CheckStatus.PASS,
-        measured_value=count,
+        status=Status.FAIL if count > 0 else Status.PASS,
+        value=count,
         threshold=0,
         message=(
             f"{count} UV loop(s) outside [0, 1] bounds"
@@ -231,9 +173,8 @@ def _check_uv_bounds(
         ),
     )
 
-
 def _check_uv_overlap(
-    objects: list[UVMeshObject],
+    objects: list,
     config: UVConfig,
 ) -> CheckResult:
     all_tris = []
@@ -244,8 +185,8 @@ def _check_uv_overlap(
     overlap_count = _find_overlapping_pairs(all_tris)
     return CheckResult(
         name="uv_overlap",
-        status=CheckStatus.FAIL if overlap_count > 0 else CheckStatus.PASS,
-        measured_value=overlap_count,
+        status=Status.FAIL if overlap_count > 0 else Status.PASS,
+        value=overlap_count,
         threshold=0,
         message=(
             f"{overlap_count} overlapping UV island pair(s) found"
@@ -253,9 +194,8 @@ def _check_uv_overlap(
         ),
     )
 
-
 def _check_texel_density(
-    objects: list[UVMeshObject],
+    objects: list,
     config: UVConfig,
 ) -> CheckResult:
     min_target, max_target = config.texel_density_target_px_per_m
@@ -273,8 +213,8 @@ def _check_texel_density(
     if not densities:
         return CheckResult(
             name="texel_density",
-            status=CheckStatus.SKIPPED,
-            measured_value={"min": 0.0, "max": 0.0, "mean": 0.0, "outlier_count": 0},
+            status=Status.SKIPPED,
+            value={"min": 0.0, "max": 0.0, "mean": 0.0, "outlier_count": 0},
             threshold=(min_target, max_target),
             message="No UV data available for texel density check",
         )
@@ -294,8 +234,8 @@ def _check_texel_density(
     }
     return CheckResult(
         name="texel_density",
-        status=CheckStatus.WARNING if outlier_count > 0 else CheckStatus.PASS,
-        measured_value=measured,
+        status=Status.WARNING if outlier_count > 0 else Status.PASS,
+        value=measured,
         threshold=(min_target, max_target),
         message=(
             f"Texel density: {outlier_count} island(s) outside target range "
@@ -305,16 +245,15 @@ def _check_texel_density(
         ),
     )
 
-
 def _check_lightmap_uv2(
-    objects: list[UVMeshObject],
+    objects: list,
     config: UVConfig,
 ) -> CheckResult:
     if not config.require_lightmap_uv2:
         return CheckResult(
             name="lightmap_uv2",
-            status=CheckStatus.SKIPPED,
-            measured_value={"present": False, "overlap_count": 0},
+            status=Status.SKIPPED,
+            value={"present": False, "overlap_count": 0},
             threshold=0,
             message="Lightmap UV2 check skipped (require_lightmap_uv2=False)",
         )
@@ -326,8 +265,8 @@ def _check_lightmap_uv2(
     if missing:
         return CheckResult(
             name="lightmap_uv2",
-            status=CheckStatus.FAIL,
-            measured_value={"present": False, "overlap_count": 0},
+            status=Status.FAIL,
+            value={"present": False, "overlap_count": 0},
             threshold=0,
             message=(
                 f"Lightmap UV layer '{config.lightmap_layer_name}' missing on "
@@ -342,8 +281,8 @@ def _check_lightmap_uv2(
     overlap_count = _find_overlapping_pairs(all_tris)
     return CheckResult(
         name="lightmap_uv2",
-        status=CheckStatus.FAIL if overlap_count > 0 else CheckStatus.PASS,
-        measured_value={"present": True, "overlap_count": overlap_count},
+        status=Status.FAIL if overlap_count > 0 else Status.PASS,
+        value={"present": True, "overlap_count": overlap_count},
         threshold=0,
         message=(
             f"Lightmap UV2 has {overlap_count} overlapping island pair(s)"
@@ -351,12 +290,11 @@ def _check_lightmap_uv2(
         ),
     )
 
-
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
 
-def check_uvs(context: UVBlenderContext, config: UVConfig) -> StageResult:
+def check_uvs(context, config: UVConfig) -> StageResult:
     """Run all UV checks and return a ``StageResult``.
 
     All checks always run — earlier failures do not short-circuit later checks.
@@ -374,8 +312,8 @@ def check_uvs(context: UVBlenderContext, config: UVConfig) -> StageResult:
     ]
 
     stage_status = (
-        StageStatus.FAIL
-        if any(c.status == CheckStatus.FAIL for c in checks)
-        else StageStatus.PASS
+        Status.FAIL
+        if any(c.status == Status.FAIL for c in checks)
+        else Status.PASS
     )
     return StageResult(name="uv", status=stage_status, checks=checks)

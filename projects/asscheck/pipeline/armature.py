@@ -16,11 +16,9 @@ vertex *i*.  An empty list signals that vertex *i* has no group assignments
 from __future__ import annotations
 
 import re
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from pipeline.schema import CheckResult, CheckStatus, StageResult, StageStatus
-
+from pipeline.schema import CheckResult, StageResult, Status
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -53,66 +51,6 @@ class ArmatureConfig:
     )
     category: str = "env_prop"
 
-
-# ---------------------------------------------------------------------------
-# Abstractions (bpy implementations in blender_tests/tests.py)
-# ---------------------------------------------------------------------------
-
-class ArmatureBone(ABC):
-    """A single bone inside an armature."""
-
-    @property
-    @abstractmethod
-    def name(self): ...
-
-    @property
-    @abstractmethod
-    def parent(self) -> "ArmatureBone | None":
-        """Parent bone, or ``None`` if this is a root bone."""
-        ...
-
-
-class ArmatureObject(ABC):
-    """An armature object in the scene."""
-
-    @property
-    @abstractmethod
-    def name(self): ...
-
-    @abstractmethod
-    def bones(self) -> list[ArmatureBone]: ...
-
-
-class SkinnedMesh(ABC):
-    """A mesh object with vertex group (skinning) data."""
-
-    @property
-    @abstractmethod
-    def name(self): ...
-
-    @abstractmethod
-    def per_vertex_weights(self):
-        """Return one entry per vertex — a list of its *non-zero* weights.
-
-        Vertices with no group assignment return an empty list ``[]``.
-        """
-        ...
-
-
-class ArmatureBlenderContext(ABC):
-    """Access to armature and skinned-mesh data in the Blender scene."""
-
-    @abstractmethod
-    def armature_objects(self) -> list[ArmatureObject]: ...
-
-    @abstractmethod
-    def skinned_meshes(self) -> list[SkinnedMesh]: ...
-
-
-# ---------------------------------------------------------------------------
-# Individual check helpers
-# ---------------------------------------------------------------------------
-
 def _check_armature_present(
     armatures: list[ArmatureObject],
     config: ArmatureConfig,
@@ -123,8 +61,8 @@ def _check_armature_present(
     if not present and required:
         return CheckResult(
             name="armature_present",
-            status=CheckStatus.FAIL,
-            measured_value=0,
+            status=Status.FAIL,
+            value=0,
             threshold=1,
             message=(
                 f"Category '{config.category}' requires an armature but none found"
@@ -133,8 +71,8 @@ def _check_armature_present(
 
     return CheckResult(
         name="armature_present",
-        status=CheckStatus.PASS,
-        measured_value=len(armatures),
+        status=Status.PASS,
+        value=len(armatures),
         threshold=1,
         message=(
             f"{len(armatures)} armature(s) found"
@@ -142,7 +80,6 @@ def _check_armature_present(
             else f"No armature (not required for category '{config.category}')"
         ),
     )
-
 
 def _check_bone_count(
     armatures: list[ArmatureObject],
@@ -153,19 +90,18 @@ def _check_bone_count(
     if total > config.max_bones:
         return CheckResult(
             name="bone_count",
-            status=CheckStatus.FAIL,
-            measured_value=total,
+            status=Status.FAIL,
+            value=total,
             threshold=config.max_bones,
             message=f"Total bone count {total} exceeds limit {config.max_bones}",
         )
     return CheckResult(
         name="bone_count",
-        status=CheckStatus.PASS,
-        measured_value=total,
+        status=Status.PASS,
+        value=total,
         threshold=config.max_bones,
         message=f"Total bone count {total} within limit {config.max_bones}",
     )
-
 
 def _check_bone_naming(
     armatures: list[ArmatureObject],
@@ -174,8 +110,8 @@ def _check_bone_naming(
     if config.bone_naming_pattern is None:
         return CheckResult(
             name="bone_naming",
-            status=CheckStatus.SKIPPED,
-            measured_value={"violations": [], "count": 0},
+            status=Status.SKIPPED,
+            value={"violations": [], "count": 0},
             threshold=None,
             message="Bone naming check skipped (no pattern configured)",
         )
@@ -190,8 +126,8 @@ def _check_bone_naming(
     count = len(violations)
     return CheckResult(
         name="bone_naming",
-        status=CheckStatus.FAIL if count > 0 else CheckStatus.PASS,
-        measured_value={"violations": violations, "count": count},
+        status=Status.FAIL if count > 0 else Status.PASS,
+        value={"violations": violations, "count": count},
         threshold=config.bone_naming_pattern,
         message=(
             f"{count} bone name(s) do not match pattern '{config.bone_naming_pattern}'"
@@ -199,7 +135,6 @@ def _check_bone_naming(
             else f"All bone names match pattern '{config.bone_naming_pattern}'"
         ),
     )
-
 
 def _check_vertex_weights(
     skinned_meshes: list[SkinnedMesh],
@@ -245,20 +180,19 @@ def _check_vertex_weights(
             parts.append(f"{unnormalized_count} unnormalized vertex(ices)")
         return CheckResult(
             name="vertex_weights",
-            status=CheckStatus.FAIL,
-            measured_value=measured,
+            status=Status.FAIL,
+            value=measured,
             threshold=config.max_influences_per_vertex,
             message="; ".join(parts),
         )
 
     return CheckResult(
         name="vertex_weights",
-        status=CheckStatus.PASS,
-        measured_value=measured,
+        status=Status.PASS,
+        value=measured,
         threshold=config.max_influences_per_vertex,
         message="All vertex weights valid",
     )
-
 
 def _check_bone_hierarchy(armatures: list[ArmatureObject]) -> CheckResult:
     """Verify each armature has exactly one root bone.
@@ -284,8 +218,8 @@ def _check_bone_hierarchy(armatures: list[ArmatureObject]) -> CheckResult:
     if total_orphan_count > 0:
         return CheckResult(
             name="bone_hierarchy",
-            status=CheckStatus.FAIL,
-            measured_value=measured,
+            status=Status.FAIL,
+            value=measured,
             threshold={"max_roots_per_armature": 1},
             message=(
                 f"Hierarchy invalid: {total_root_count} root bone(s), "
@@ -295,26 +229,25 @@ def _check_bone_hierarchy(armatures: list[ArmatureObject]) -> CheckResult:
 
     return CheckResult(
         name="bone_hierarchy",
-        status=CheckStatus.PASS,
-        measured_value=measured,
+        status=Status.PASS,
+        value=measured,
         threshold={"max_roots_per_armature": 1},
         message=(
             f"Bone hierarchy valid: {total_root_count} root bone(s), no orphans"
         ),
     )
 
-
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
 
 def check_armature(
-    context: ArmatureBlenderContext,
+    context,
     config: ArmatureConfig,
 ) -> StageResult:
     """Run all armature checks and return a ``StageResult``.
 
-    Early-exits with ``StageStatus.SKIPPED`` when no armatures are present and
+    Early-exits with ``Status.SKIPPED`` when no armatures are present and
     the asset category does not require one.
     """
     armatures = context.armature_objects()
@@ -323,12 +256,12 @@ def check_armature(
     if not armatures and config.category not in config.categories_requiring_armature:
         return StageResult(
             name="armature",
-            status=StageStatus.SKIPPED,
+            status=Status.SKIPPED,
             checks=[
                 CheckResult(
                     name="armature_present",
-                    status=CheckStatus.SKIPPED,
-                    measured_value=0,
+                    status=Status.SKIPPED,
+                    value=0,
                     threshold=None,
                     message=(
                         f"No armature; category '{config.category}' does not require one"
@@ -348,8 +281,8 @@ def check_armature(
     ]
 
     stage_status = (
-        StageStatus.FAIL
-        if any(c.status == CheckStatus.FAIL for c in checks)
-        else StageStatus.PASS
+        Status.FAIL
+        if any(c.status == Status.FAIL for c in checks)
+        else Status.PASS
     )
     return StageResult(name="armature", status=stage_status, checks=checks)

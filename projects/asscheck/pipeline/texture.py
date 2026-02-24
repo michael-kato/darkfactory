@@ -7,11 +7,9 @@ count per material, channel count/bit depth, and color space assignment.
 """
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from pipeline.schema import CheckResult, CheckStatus, StageResult, StageStatus
-
+from pipeline.schema import CheckResult, StageResult, Status
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -38,7 +36,6 @@ class TextureConfig:
     is_hero_asset: bool = False
     max_textures_per_material: int = 8
 
-
 # ---------------------------------------------------------------------------
 # Data types
 # ---------------------------------------------------------------------------
@@ -63,64 +60,6 @@ class ImageTextureNode:
     image_name: str
     filepath_missing: bool
 
-
-# ---------------------------------------------------------------------------
-# Abstractions (bpy implementations in blender_tests/tests.py)
-# ---------------------------------------------------------------------------
-
-class TextureMaterial(ABC):
-    """A single material with access to its Image Texture nodes."""
-
-    @property
-    @abstractmethod
-    def name(self): ...
-
-    @abstractmethod
-    def image_texture_nodes(self) -> list[ImageTextureNode]:
-        """Return all Image Texture nodes in this material's node graph."""
-        ...
-
-
-class TextureImage(ABC):
-    """A single loaded image."""
-
-    @property
-    @abstractmethod
-    def name(self): ...
-
-    @property
-    @abstractmethod
-    def size(self):
-        """Return (width, height) in pixels."""
-        ...
-
-    @property
-    @abstractmethod
-    def depth(self):
-        """Return bit depth (e.g. 24 for RGB 8-bit, 32 for RGBA 8-bit)."""
-        ...
-
-    @property
-    @abstractmethod
-    def colorspace_name(self):
-        """Return the color space name (e.g. 'sRGB', 'Non-Color', 'Linear')."""
-        ...
-
-
-class TextureBlenderContext(ABC):
-    """Access to the loaded scene for texture checking."""
-
-    @abstractmethod
-    def materials(self) -> list[TextureMaterial]: ...
-
-    @abstractmethod
-    def images(self) -> list[TextureImage]: ...
-
-
-# ---------------------------------------------------------------------------
-# Color space inference helpers
-# ---------------------------------------------------------------------------
-
 _SRGB_KEYWORDS = (
     "albedo", "diffuse", "color", "colour", "basecolor", "base_color",
 )
@@ -128,7 +67,6 @@ _LINEAR_KEYWORDS = (
     "normal", "rough", "roughness", "metal", "metallic",
     "ao", "ambient_occlusion", "specular", "height", "bump", "displacement",
 )
-
 
 def _infer_expected_colorspace(socket_name, image_name):
     """Infer expected color space from socket and image name keywords.
@@ -145,7 +83,6 @@ def _infer_expected_colorspace(socket_name, image_name):
                 return "Non-Color"
     return None
 
-
 # ---------------------------------------------------------------------------
 # Individual check helpers
 # ---------------------------------------------------------------------------
@@ -161,8 +98,8 @@ def _check_missing_textures(
     )
     return CheckResult(
         name="missing_textures",
-        status=CheckStatus.FAIL if broken > 0 else CheckStatus.PASS,
-        measured_value=broken,
+        status=Status.FAIL if broken > 0 else Status.PASS,
+        value=broken,
         threshold=0,
         message=(
             f"{broken} texture reference(s) with missing files"
@@ -170,10 +107,8 @@ def _check_missing_textures(
         ),
     )
 
-
 def _is_power_of_two(n):
     return n > 0 and (n & (n - 1)) == 0
-
 
 def _check_resolution_limit(
     images: list[TextureImage],
@@ -190,15 +125,14 @@ def _check_resolution_limit(
             violations.append({"name": img.name, "size": [w, h], "limit": limit})
     return CheckResult(
         name="resolution_limit",
-        status=CheckStatus.FAIL if violations else CheckStatus.PASS,
-        measured_value={"violations": violations},
+        status=Status.FAIL if violations else Status.PASS,
+        value={"violations": violations},
         threshold=limit,
         message=(
             f"{len(violations)} image(s) exceed resolution limit of {limit}px"
             if violations else f"All images within resolution limit of {limit}px"
         ),
     )
-
 
 def _check_power_of_two(
     images: list[TextureImage],
@@ -210,15 +144,14 @@ def _check_power_of_two(
             violations.append({"name": img.name, "size": [w, h]})
     return CheckResult(
         name="power_of_two",
-        status=CheckStatus.FAIL if violations else CheckStatus.PASS,
-        measured_value={"violations": violations},
+        status=Status.FAIL if violations else Status.PASS,
+        value={"violations": violations},
         threshold=0,
         message=(
             f"{len(violations)} image(s) have non-power-of-two dimensions"
             if violations else "All images have power-of-two dimensions"
         ),
     )
-
 
 def _check_texture_count(
     materials: list[TextureMaterial],
@@ -234,8 +167,8 @@ def _check_texture_count(
     failed = worst_count > config.max_textures_per_material
     return CheckResult(
         name="texture_count",
-        status=CheckStatus.FAIL if failed else CheckStatus.PASS,
-        measured_value={"max": worst_count, "material": worst_mat},
+        status=Status.FAIL if failed else Status.PASS,
+        value={"max": worst_count, "material": worst_mat},
         threshold=config.max_textures_per_material,
         message=(
             f"Material '{worst_mat}' has {worst_count} texture(s) "
@@ -245,9 +178,7 @@ def _check_texture_count(
         ),
     )
 
-
 _STANDARD_DEPTHS: frozenset[int] = frozenset({24, 32})
-
 
 def _check_channel_depth(
     images: list[TextureImage],
@@ -259,8 +190,8 @@ def _check_channel_depth(
     ]
     return CheckResult(
         name="channel_depth",
-        status=CheckStatus.WARNING if flagged else CheckStatus.PASS,
-        measured_value={"images": flagged},
+        status=Status.WARNING if flagged else Status.PASS,
+        value={"images": flagged},
         threshold=sorted(_STANDARD_DEPTHS),
         message=(
             f"{len(flagged)} image(s) have non-standard bit depth "
@@ -268,7 +199,6 @@ def _check_channel_depth(
             if flagged else "All images have standard bit depth (24 or 32)"
         ),
     )
-
 
 def _check_color_space(
     materials: list[TextureMaterial],
@@ -305,8 +235,8 @@ def _check_color_space(
 
     return CheckResult(
         name="color_space",
-        status=CheckStatus.WARNING if violations else CheckStatus.PASS,
-        measured_value={"violations": violations},
+        status=Status.WARNING if violations else Status.PASS,
+        value={"violations": violations},
         threshold=None,
         message=(
             f"{len(violations)} color space mismatch(es) detected — flagged for review"
@@ -314,13 +244,12 @@ def _check_color_space(
         ),
     )
 
-
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
 
 def check_textures(
-    context: TextureBlenderContext,
+    context,
     config: TextureConfig,
 ) -> StageResult:
     """Run all texture checks and return a ``StageResult``.
@@ -342,8 +271,8 @@ def check_textures(
     ]
 
     stage_status = (
-        StageStatus.FAIL
-        if any(c.status == CheckStatus.FAIL for c in checks)
-        else StageStatus.PASS
+        Status.FAIL
+        if any(c.status == Status.FAIL for c in checks)
+        else Status.PASS
     )
     return StageResult(name="texture", status=stage_status, checks=checks)

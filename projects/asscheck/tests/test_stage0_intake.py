@@ -1,9 +1,9 @@
-"""Tests for pipeline/stage0/intake.py — Stage 0: Intake & Triage."""
+"""Tests for pipeline/intake.py — Stage 0: Intake & Triage."""
 from pathlib import Path
 
 import pytest
 
-from pipeline.schema import CheckStatus, StageStatus
+from pipeline.schema import Status
 from pipeline.intake import IntakeConfig, run_intake
 
 ASSETS_DIR = Path(__file__).parent.parent / "assets"
@@ -17,13 +17,13 @@ _DEFAULT = dict(
 )
 
 
-def _config(file_path, **overrides) -> IntakeConfig:
+def _config(file_path, **overrides):
     return IntakeConfig(file_path=str(file_path), **{**_DEFAULT, **overrides})
 
 
 def _skip_if_no_assets():
-    if not ASSETS_DIR.exists():
-        pytest.skip("assets/ directory not present")
+    if not (ASSETS_DIR / "street_lamp_01.gltf").exists():
+        pytest.skip("real test assets not present")
 
 
 # ---------------------------------------------------------------------------
@@ -34,26 +34,26 @@ def test_valid_gltf_passes():
     _skip_if_no_assets()
     report = run_intake(_config(ASSETS_DIR / "street_lamp_01.gltf"))
     stage = report.stages[0]
-    assert stage.status == StageStatus.PASS
-    assert report.metadata.asset_id != ""
+    assert stage.status == Status.PASS
+    assert report.asset_id != ""
 
 
 def test_valid_glb_passes():
     _skip_if_no_assets()
     report = run_intake(_config(ASSETS_DIR / "large_iron_gate_left_door.glb"))
-    assert report.stages[0].status == StageStatus.PASS
+    assert report.stages[0].status == Status.PASS
 
 
 def test_valid_fbx_passes():
     _skip_if_no_assets()
     report = run_intake(_config(ASSETS_DIR / "tree_small_02_branches.fbx"))
-    assert report.stages[0].status == StageStatus.PASS
+    assert report.stages[0].status == Status.PASS
 
 
 def test_valid_obj_passes():
     _skip_if_no_assets()
     report = run_intake(_config(ASSETS_DIR / "double_door_standard_01.obj"))
-    assert report.stages[0].status == StageStatus.PASS
+    assert report.stages[0].status == Status.PASS
 
 
 # ---------------------------------------------------------------------------
@@ -63,13 +63,13 @@ def test_valid_obj_passes():
 def test_blend_file_fails(tmp_path):
     f = tmp_path / "model.blend"
     f.write_bytes(b"BLENDER_v300")
-    assert run_intake(_config(f)).stages[0].status == StageStatus.FAIL
+    assert run_intake(_config(f)).stages[0].status == Status.FAIL
 
 
 def test_zip_file_fails(tmp_path):
     f = tmp_path / "model.zip"
     f.write_bytes(b"PK\x03\x04")
-    assert run_intake(_config(f)).stages[0].status == StageStatus.FAIL
+    assert run_intake(_config(f)).stages[0].status == Status.FAIL
 
 
 # ---------------------------------------------------------------------------
@@ -78,7 +78,7 @@ def test_zip_file_fails(tmp_path):
 
 def test_nonexistent_path_fails():
     report = run_intake(_config("/nonexistent/does_not_exist.gltf"))
-    assert report.stages[0].status == StageStatus.FAIL
+    assert report.stages[0].status == Status.FAIL
 
 
 # ---------------------------------------------------------------------------
@@ -89,7 +89,7 @@ def test_exceeds_hard_max_fails():
     _skip_if_no_assets()
     fbx = ASSETS_DIR / "tree_small_02_branches.fbx"
     report = run_intake(_config(fbx, hard_max_bytes=50 * 1024 * 1024))
-    assert report.stages[0].status == StageStatus.FAIL
+    assert report.stages[0].status == Status.FAIL
 
 
 def test_exceeds_category_limit_warns_but_passes():
@@ -102,9 +102,9 @@ def test_exceeds_category_limit_warns_but_passes():
     )
     report = run_intake(config)
     stage = report.stages[0]
-    assert stage.status == StageStatus.PASS
+    assert stage.status == Status.PASS
     size_check = next(c for c in stage.checks if c.name == "file_size")
-    assert size_check.status == CheckStatus.WARNING
+    assert size_check.status == Status.WARNING
 
 
 # ---------------------------------------------------------------------------
@@ -116,4 +116,4 @@ def test_two_runs_produce_different_asset_ids():
     config = _config(ASSETS_DIR / "street_lamp_01.gltf")
     report1 = run_intake(config)
     report2 = run_intake(config)
-    assert report1.metadata.asset_id != report2.metadata.asset_id
+    assert report1.asset_id != report2.asset_id

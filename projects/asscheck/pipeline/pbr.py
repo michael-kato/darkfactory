@@ -12,11 +12,9 @@ Pixel data conventions:
 from __future__ import annotations
 
 import random
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from pipeline.schema import CheckResult, CheckStatus, StageResult, StageStatus
-
+from pipeline.schema import CheckResult, StageResult, Status
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -46,7 +44,6 @@ class PBRConfig:
     albedo_sample_count: int = 1000
     metalness_binary_threshold: float = 0.1
 
-
 # ---------------------------------------------------------------------------
 # Data types
 # ---------------------------------------------------------------------------
@@ -69,96 +66,8 @@ class NormalMapData:
     colorspace: str
     pixels: list[float] | None
 
-
-# ---------------------------------------------------------------------------
-# Abstractions (bpy implementations in blender_tests/tests.py)
-# ---------------------------------------------------------------------------
-
-class PBRMaterial(ABC):
-    """A single material with PBR node graph information."""
-
-    @property
-    @abstractmethod
-    def name(self): ...
-
-    @abstractmethod
-    def has_nodes(self):
-        """Return True if the material has any nodes (non-empty node tree)."""
-        ...
-
-    @abstractmethod
-    def uses_principled_bsdf(self):
-        """Return True if a Principled BSDF node is connected to the output."""
-        ...
-
-    @abstractmethod
-    def uses_spec_gloss(self):
-        """Return True if a Specular BSDF or Glossiness socket is in use."""
-        ...
-
-    @abstractmethod
-    def orphan_image_node_count(self):
-        """Return count of Image Texture nodes with no connected outputs."""
-        ...
-
-    @abstractmethod
-    def has_node_cycles(self):
-        """Return True if the node graph contains a directed cycle."""
-        ...
-
-    @abstractmethod
-    def albedo_pixels(self):
-        """Flat RGBA pixel data in sRGB [0, 1] from the Base Color texture.
-
-        Returns None if no base color texture is present.
-        """
-        ...
-
-    @abstractmethod
-    def metalness_pixels(self):
-        """Flat RGBA pixel data in linear [0, 1] from the Metallic texture."""
-        ...
-
-    @abstractmethod
-    def roughness_pixels(self):
-        """Flat RGBA pixel data in linear [0, 1] from the Roughness texture."""
-        ...
-
-    @abstractmethod
-    def normal_map_data(self) -> list[NormalMapData]:
-        """Return NormalMapData for each image connected to a Normal Map node."""
-        ...
-
-
-class PBRMeshObject(ABC):
-    """A single mesh object exposing its material slot count."""
-
-    @property
-    @abstractmethod
-    def name(self): ...
-
-    @property
-    @abstractmethod
-    def material_slot_count(self): ...
-
-
-class PBRBlenderContext(ABC):
-    """Access to the loaded Blender scene for PBR checking."""
-
-    @abstractmethod
-    def mesh_objects(self) -> list[PBRMeshObject]: ...
-
-    @abstractmethod
-    def materials(self) -> list[PBRMaterial]: ...
-
-
-# ---------------------------------------------------------------------------
-# Pixel sampling helpers
-# ---------------------------------------------------------------------------
-
 _NEAR_ZERO = 1e-6
 _NEAR_ONE = 1.0 - 1e-6
-
 
 def _rgb_samples(pixels, max_samples):
     """Extract up to *max_samples* (R, G, B) tuples from a flat RGBA list."""
@@ -172,7 +81,6 @@ def _rgb_samples(pixels, max_samples):
     )
     return [(pixels[i * 4], pixels[i * 4 + 1], pixels[i * 4 + 2]) for i in indices]
 
-
 def _r_samples(pixels, max_samples):
     """Extract up to *max_samples* R-channel values from a flat RGBA list."""
     total = len(pixels) // 4
@@ -182,7 +90,6 @@ def _r_samples(pixels, max_samples):
         chosen = random.sample(range(total), max_samples)
         return [pixels[i * 4] for i in chosen]
     return [pixels[i * 4] for i in range(total)]
-
 
 # ---------------------------------------------------------------------------
 # Individual check helpers
@@ -196,8 +103,8 @@ def _check_pbr_workflow(materials: list[PBRMaterial]) -> CheckResult:
     ]
     return CheckResult(
         name="pbr_workflow",
-        status=CheckStatus.FAIL if non_compliant else CheckStatus.PASS,
-        measured_value=non_compliant,
+        status=Status.FAIL if non_compliant else Status.PASS,
+        value=non_compliant,
         threshold=0,
         message=(
             f"{len(non_compliant)} material(s) not using Principled BSDF: "
@@ -207,9 +114,8 @@ def _check_pbr_workflow(materials: list[PBRMaterial]) -> CheckResult:
         ),
     )
 
-
 def _check_material_slots(
-    mesh_objects: list[PBRMeshObject],
+    mesh_objects: list,
     config: PBRConfig,
 ) -> CheckResult:
     worst_count = 0
@@ -222,8 +128,8 @@ def _check_material_slots(
     failed = worst_count > config.max_material_slots
     return CheckResult(
         name="material_slots",
-        status=CheckStatus.FAIL if failed else CheckStatus.PASS,
-        measured_value={"max": worst_count, "object": worst_object},
+        status=Status.FAIL if failed else Status.PASS,
+        value={"max": worst_count, "object": worst_object},
         threshold=config.max_material_slots,
         message=(
             f"Object '{worst_object}' has {worst_count} material slot(s) "
@@ -232,7 +138,6 @@ def _check_material_slots(
             else f"All objects within material slot limit of {config.max_material_slots}"
         ),
     )
-
 
 def _check_albedo_range(
     materials: list[PBRMaterial],
@@ -249,8 +154,8 @@ def _check_albedo_range(
     if not all_rgb:
         return CheckResult(
             name="albedo_range",
-            status=CheckStatus.PASS,
-            measured_value={"fraction_out_of_range": 0.0, "sample_count": 0},
+            status=Status.PASS,
+            value={"fraction_out_of_range": 0.0, "sample_count": 0},
             threshold={"min": config.albedo_min_srgb, "max": config.albedo_max_srgb},
             message="No albedo textures found — skipped",
         )
@@ -274,8 +179,8 @@ def _check_albedo_range(
     warning = fraction > 0.05
     return CheckResult(
         name="albedo_range",
-        status=CheckStatus.WARNING if warning else CheckStatus.PASS,
-        measured_value={"fraction_out_of_range": fraction, "sample_count": len(all_rgb)},
+        status=Status.WARNING if warning else Status.PASS,
+        value={"fraction_out_of_range": fraction, "sample_count": len(all_rgb)},
         threshold={"min": config.albedo_min_srgb, "max": config.albedo_max_srgb},
         message=(
             f"{fraction:.1%} of sampled albedo pixels outside sRGB "
@@ -285,7 +190,6 @@ def _check_albedo_range(
             else "Albedo pixel values within expected sRGB range"
         ),
     )
-
 
 def _check_metalness_binary(
     materials: list[PBRMaterial],
@@ -302,8 +206,8 @@ def _check_metalness_binary(
     if not all_values:
         return CheckResult(
             name="metalness_binary",
-            status=CheckStatus.PASS,
-            measured_value={"fraction_gradient": 0.0},
+            status=Status.PASS,
+            value={"fraction_gradient": 0.0},
             threshold=config.metalness_binary_threshold,
             message="No metalness textures found — skipped",
         )
@@ -317,8 +221,8 @@ def _check_metalness_binary(
     warning = fraction > 0.10
     return CheckResult(
         name="metalness_binary",
-        status=CheckStatus.WARNING if warning else CheckStatus.PASS,
-        measured_value={"fraction_gradient": fraction},
+        status=Status.WARNING if warning else Status.PASS,
+        value={"fraction_gradient": fraction},
         threshold=config.metalness_binary_threshold,
         message=(
             f"{fraction:.1%} of metalness pixels are gradient values "
@@ -327,7 +231,6 @@ def _check_metalness_binary(
             else "Metalness values are predominantly binary (near 0 or 1)"
         ),
     )
-
 
 def _check_roughness_range(
     materials: list[PBRMaterial],
@@ -344,8 +247,8 @@ def _check_roughness_range(
     if not all_values:
         return CheckResult(
             name="roughness_range",
-            status=CheckStatus.PASS,
-            measured_value={"fraction_pure_zero": 0.0, "fraction_pure_one": 0.0},
+            status=Status.PASS,
+            value={"fraction_pure_zero": 0.0, "fraction_pure_one": 0.0},
             threshold=0.5,
             message="No roughness textures found — skipped",
         )
@@ -361,8 +264,8 @@ def _check_roughness_range(
     warning = frac_zero > 0.5 or frac_one > 0.5
     return CheckResult(
         name="roughness_range",
-        status=CheckStatus.WARNING if warning else CheckStatus.PASS,
-        measured_value={"fraction_pure_zero": frac_zero, "fraction_pure_one": frac_one},
+        status=Status.WARNING if warning else Status.PASS,
+        value={"fraction_pure_zero": frac_zero, "fraction_pure_one": frac_one},
         threshold=0.5,
         message=(
             "Roughness dominated by extreme values "
@@ -371,7 +274,6 @@ def _check_roughness_range(
             else "Roughness values have reasonable spread"
         ),
     )
-
 
 def _check_normal_map(materials: list[PBRMaterial]) -> CheckResult:
     """Verify normal maps use Non-Color colorspace and are blue-channel dominant."""
@@ -393,8 +295,8 @@ def _check_normal_map(materials: list[PBRMaterial]) -> CheckResult:
     failed = bool(colorspace_violations or channel_violations)
     return CheckResult(
         name="normal_map",
-        status=CheckStatus.FAIL if failed else CheckStatus.PASS,
-        measured_value={
+        status=Status.FAIL if failed else Status.PASS,
+        value={
             "colorspace_violations": colorspace_violations,
             "channel_violations": channel_violations,
         },
@@ -406,7 +308,6 @@ def _check_normal_map(materials: list[PBRMaterial]) -> CheckResult:
             else "All normal maps use correct colorspace and are blue-channel dominant"
         ),
     )
-
 
 def _check_node_graph(materials: list[PBRMaterial]) -> CheckResult:
     """Flag node graph issues: orphan image nodes, cycles, empty material slots."""
@@ -426,8 +327,8 @@ def _check_node_graph(materials: list[PBRMaterial]) -> CheckResult:
 
     return CheckResult(
         name="node_graph",
-        status=CheckStatus.WARNING if issues else CheckStatus.PASS,
-        measured_value=issues,
+        status=Status.WARNING if issues else Status.PASS,
+        value=issues,
         threshold=None,
         message=(
             f"{len(issues)} node graph issue(s) detected — flagged for review"
@@ -436,13 +337,12 @@ def _check_node_graph(materials: list[PBRMaterial]) -> CheckResult:
         ),
     )
 
-
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
 
 def check_pbr(
-    context: PBRBlenderContext,
+    context,
     config: PBRConfig,
 ) -> StageResult:
     """Run all PBR material checks and return a ``StageResult``.
@@ -467,8 +367,8 @@ def check_pbr(
     ]
 
     stage_status = (
-        StageStatus.FAIL
-        if any(c.status == CheckStatus.FAIL for c in checks)
-        else StageStatus.PASS
+        Status.FAIL
+        if any(c.status == Status.FAIL for c in checks)
+        else Status.PASS
     )
     return StageResult(name="pbr", status=stage_status, checks=checks)

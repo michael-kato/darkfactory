@@ -10,7 +10,7 @@ Covers:
   - Stage 1d: PBR checks (workflow, albedo/metalness/roughness ranges, normal maps)
   - Stage 1e: armature checks (skipped for env_prop)
   - Stage 1f: scene checks (naming, hierarchy, performance estimates)
-  - Stage 2:  auto-remediation (fixes + review flags)
+  - Stage 2:  autofix (fixes + review flags)
   - Stage 5:  turntable renderer
 
 Exit code: 0 if all tests passed or skipped, 1 if any failed.
@@ -31,59 +31,37 @@ ASSETS_DIR = _PROJECT_ROOT / "assets"
 import bpy          # noqa: E402
 import bmesh as _bmesh  # noqa: E402
 
-from pipeline.schema import CheckStatus, StageResult, StageStatus  # noqa: E402
+from pipeline.schema import StageResult, Status  # noqa: E402
 
 from pipeline.geometry import (  # noqa: E402
-    BlenderContext as GeomBlenderContext,
     GeometryConfig,
-    MeshObject,
     check_geometry,
 )
 from pipeline.uv import (  # noqa: E402
-    UVBlenderContext,
     UVConfig,
-    UVMeshObject,
     check_uvs,
 )
 from pipeline.texture import (  # noqa: E402
     ImageTextureNode,
-    TextureBlenderContext,
     TextureConfig,
-    TextureImage,
-    TextureMaterial,
     check_textures,
 )
 from pipeline.pbr import (  # noqa: E402
     NormalMapData,
-    PBRBlenderContext,
     PBRConfig,
-    PBRMaterial,
-    PBRMeshObject,
     check_pbr,
 )
 from pipeline.armature import (  # noqa: E402
-    ArmatureBlenderContext,
-    ArmatureBone,
     ArmatureConfig,
-    ArmatureObject,
-    SkinnedMesh,
     check_armature,
 )
 from pipeline.scene import (  # noqa: E402
-    SceneArmatureObject,
-    SceneBlenderContext,
     SceneConfig,
-    SceneImage,
-    SceneMeshObject,
     check_scene,
 )
-from pipeline.remediate import (  # noqa: E402
-    RemediationBlenderContext,
-    RemediationConfig,
-    RemediationImage,
-    RemediationMeshObject,
-    RemediationSkinnedMesh,
-    run_remediation,
+from pipeline.autofix import (  # noqa: E402
+    AutofixConfig,
+    run_autofix,
 )
 from pipeline.turntable import TurntableConfig, render_turntable  # noqa: E402
 
@@ -107,7 +85,7 @@ def _clear_scene():
 # Stage 1a — Geometry
 # ===========================================================================
 
-class BpyGeomMeshObject(MeshObject):
+class BpyGeomMeshObject:
     def __init__(self, obj):
         self._obj = obj
 
@@ -124,7 +102,7 @@ class BpyGeomMeshObject(MeshObject):
         return bm
 
 
-class BpyGeomContext(GeomBlenderContext):
+class BpyGeomContext:
     def mesh_objects(self) -> list[BpyGeomMeshObject]:
         return [
             BpyGeomMeshObject(obj)
@@ -207,7 +185,7 @@ def run_geometry_tests():
 # Stage 1b — UV
 # ===========================================================================
 
-class BpyUVMeshObject(UVMeshObject):
+class BpyUVMeshObject:
     def __init__(self, obj):
         self._obj = obj
         self._bm = None
@@ -265,8 +243,8 @@ class BpyUVMeshObject(UVMeshObject):
             self._bm = None
 
 
-class BpyUVContext(UVBlenderContext):
-    def mesh_objects(self) -> list[UVMeshObject]:
+class BpyUVContext:
+    def mesh_objects(self):
         return [
             BpyUVMeshObject(obj)
             for obj in bpy.data.objects
@@ -362,7 +340,7 @@ def _tex_filepath_is_missing(image):
     return not os.path.exists(abs_path)
 
 
-class BpyTexMaterial(TextureMaterial):
+class BpyTexMaterial:
     def __init__(self, mat):
         self._mat = mat
 
@@ -387,7 +365,7 @@ class BpyTexMaterial(TextureMaterial):
         return nodes
 
 
-class BpyTexImage(TextureImage):
+class BpyTexImage:
     def __init__(self, image):
         self._image = image
 
@@ -408,7 +386,7 @@ class BpyTexImage(TextureImage):
         return self._image.colorspace_settings.name
 
 
-class BpyTexContext(TextureBlenderContext):
+class BpyTexContext:
     def materials(self) -> list[TextureMaterial]:
         return [
             BpyTexMaterial(mat)
@@ -579,7 +557,7 @@ def _detect_cycles(node_tree):
     return False
 
 
-class BpyPBRMesh(PBRMeshObject):
+class BpyPBRMesh:
     def __init__(self, obj):
         self._obj = obj
 
@@ -592,7 +570,7 @@ class BpyPBRMesh(PBRMeshObject):
         return len(self._obj.material_slots)
 
 
-class BpyPBRMaterial(PBRMaterial):
+class BpyPBRMaterial:
     def __init__(self, mat):
         self._mat = mat
 
@@ -693,15 +671,15 @@ class BpyPBRMaterial(PBRMaterial):
         return data
 
 
-class BpyPBRContext(PBRBlenderContext):
-    def mesh_objects(self) -> list[PBRMeshObject]:
+class BpyPBRContext:
+    def mesh_objects(self):
         return [
             BpyPBRMesh(obj)
             for obj in bpy.context.scene.objects
             if obj.type == "MESH"
         ]
 
-    def materials(self) -> list[PBRMaterial]:
+    def materials(self):
         return [
             BpyPBRMaterial(mat)
             for mat in bpy.data.materials
@@ -785,7 +763,7 @@ def run_pbr_tests():
 # Stage 1e — Armature
 # ===========================================================================
 
-class BpyArmBone(ArmatureBone):
+class BpyArmBone:
     def __init__(self, bone):
         self._bone = bone
 
@@ -800,7 +778,7 @@ class BpyArmBone(ArmatureBone):
         return BpyArmBone(self._bone.parent)
 
 
-class BpyArmObject(ArmatureObject):
+class BpyArmObject:
     def __init__(self, obj):
         self._obj = obj
 
@@ -812,7 +790,7 @@ class BpyArmObject(ArmatureObject):
         return [BpyArmBone(b) for b in self._obj.data.bones]
 
 
-class BpySkinned(SkinnedMesh):
+class BpySkinned:
     def __init__(self, obj):
         self._obj = obj
 
@@ -829,7 +807,7 @@ class BpySkinned(SkinnedMesh):
         return result
 
 
-class BpyArmContext(ArmatureBlenderContext):
+class BpyArmContext:
     def armature_objects(self) -> list[BpyArmObject]:
         return [
             BpyArmObject(obj)
@@ -866,7 +844,7 @@ def run_armature_tests():
 
     if result.name != "armature":
         failures.append(f"env_prop: stage name '{result.name}' != 'armature'")
-    if result.status != StageStatus.SKIPPED:
+    if result.status != Status.SKIPPED:
         failures.append(
             f"env_prop: expected SKIPPED (no armature), got {result.status.value}"
         )
@@ -886,7 +864,7 @@ def run_armature_tests():
 # Stage 1f — Scene
 # ===========================================================================
 
-class BpySceneMesh(SceneMeshObject):
+class BpySceneMesh:
     def __init__(self, obj):
         self._obj = obj
 
@@ -902,7 +880,7 @@ class BpySceneMesh(SceneMeshObject):
         return max(1, len(self._obj.material_slots))
 
 
-class BpySceneArm(SceneArmatureObject):
+class BpySceneArm:
     def __init__(self, obj):
         self._obj = obj
 
@@ -914,7 +892,7 @@ class BpySceneArm(SceneArmatureObject):
         return len(self._obj.data.bones)
 
 
-class BpySceneImage(SceneImage):
+class BpySceneImage:
     def __init__(self, image):
         self._image = image
 
@@ -937,7 +915,7 @@ class BpySceneImage(SceneImage):
         return 8
 
 
-class BpySceneCtx(SceneBlenderContext):
+class BpySceneCtx:
     def mesh_objects(self) -> list[BpySceneMesh]:
         return [
             BpySceneMesh(obj)
@@ -993,16 +971,16 @@ def run_scene_tests():
 
     if stage_result.name != "scene":
         failures.append(f"smoke: stage name '{stage_result.name}' != 'scene'")
-    if stage_result.status not in (StageStatus.PASS, StageStatus.FAIL):
+    if stage_result.status not in (Status.PASS, Status.FAIL):
         failures.append(f"smoke: unexpected status {stage_result.status.value}")
-    if perf.triangle_count < 0:
-        failures.append(f"smoke: triangle_count < 0: {perf.triangle_count}")
-    if perf.draw_call_estimate < 0:
-        failures.append(f"smoke: draw_call_estimate < 0: {perf.draw_call_estimate}")
-    if perf.vram_estimate_mb < 0.0:
-        failures.append(f"smoke: vram_estimate_mb < 0: {perf.vram_estimate_mb}")
-    if perf.bone_count < 0:
-        failures.append(f"smoke: bone_count < 0: {perf.bone_count}")
+    if perf.triangles < 0:
+        failures.append(f"smoke: triangle_count < 0: {perf.triangles}")
+    if perf.draw_calls < 0:
+        failures.append(f"smoke: draw_call_estimate < 0: {perf.draw_calls}")
+    if perf.vram_mb < 0.0:
+        failures.append(f"smoke: vram_estimate_mb < 0: {perf.vram_mb}")
+    if perf.bones < 0:
+        failures.append(f"smoke: bone_count < 0: {perf.bones}")
 
     json.loads(json.dumps({
         "stage": {
@@ -1011,10 +989,10 @@ def run_scene_tests():
             "checks": [{"name": c.name, "status": c.status.value} for c in stage_result.checks],
         },
         "performance": {
-            "triangle_count": perf.triangle_count,
-            "draw_call_estimate": perf.draw_call_estimate,
-            "vram_estimate_mb": perf.vram_estimate_mb,
-            "bone_count": perf.bone_count,
+            "triangles": perf.triangles,
+            "draw_calls": perf.draw_calls,
+            "vram_mb": perf.vram_mb,
+            "bones": perf.bones,
         },
     }))
 
@@ -1025,7 +1003,7 @@ def run_scene_tests():
 # Stage 2 — Remediation
 # ===========================================================================
 
-class BpyRemMesh(RemediationMeshObject):
+class BpyAutofixMesh:
     def __init__(self, obj):
         self._obj = obj
 
@@ -1054,7 +1032,7 @@ class BpyRemMesh(RemediationMeshObject):
         return len(self._obj.data.vertices)
 
 
-class BpyRemImage(RemediationImage):
+class BpyAutofixImage:
     def __init__(self, img):
         self._img = img
 
@@ -1070,7 +1048,7 @@ class BpyRemImage(RemediationImage):
         self._img.scale(new_w, new_h)
 
 
-class BpyRemSkinned(RemediationSkinnedMesh):
+class BpyAutofixSkinned:
     def __init__(self, obj):
         self._obj = obj
 
@@ -1088,20 +1066,20 @@ class BpyRemSkinned(RemediationSkinnedMesh):
         return max_inf
 
 
-class BpyRemContext(RemediationBlenderContext):
-    def mesh_objects(self) -> list[BpyRemMesh]:
+class BpyAutofixContext:
+    def mesh_objects(self) -> list[BpyAutofixMesh]:
         return [
-            BpyRemMesh(obj)
+            BpyAutofixMesh(obj)
             for obj in bpy.context.scene.objects
             if obj.type == "MESH"
         ]
 
-    def images(self) -> list[BpyRemImage]:
-        return [BpyRemImage(img) for img in bpy.data.images]
+    def images(self) -> list[BpyAutofixImage]:
+        return [BpyAutofixImage(img) for img in bpy.data.images]
 
-    def skinned_meshes(self) -> list[BpyRemSkinned]:
+    def skinned_meshes(self) -> list[BpyAutofixSkinned]:
         return [
-            BpyRemSkinned(obj)
+            BpyAutofixSkinned(obj)
             for obj in bpy.context.scene.objects
             if obj.type == "MESH" and obj.vertex_groups
         ]
@@ -1113,8 +1091,8 @@ class BpyRemContext(RemediationBlenderContext):
         bpy.ops.object.vertex_group_normalize_all()
 
 
-def run_remediation_tests():
-    """Run stage 2 remediation tests. Returns dict with 'passed' key."""
+def run_autofix_tests():
+    """Run stage 2 autofix tests. Returns dict with 'passed' key."""
     asset = ASSETS_DIR / "street_lamp_01.gltf"
     if not ASSETS_DIR.exists() or not asset.exists():
         return {"skipped": True, "reason": f"asset not found: {asset}"}
@@ -1129,22 +1107,22 @@ def run_remediation_tests():
     tex_result = check_textures(BpyTexContext(), TextureConfig(max_resolution_standard=2048))
     stage1_results: list[StageResult] = [geom_result, tex_result]
 
-    result = run_remediation(BpyRemContext(), stage1_results, RemediationConfig())
+    result = run_autofix(BpyAutofixContext(), stage1_results, AutofixConfig())
 
-    if result.name != "remediation":
-        failures.append(f"stage name '{result.name}' != 'remediation'")
-    if result.status != StageStatus.PASS:
+    if result.name != "autofix":
+        failures.append(f"stage name '{result.name}' != 'autofix'")
+    if result.status != Status.PASS:
         failures.append(f"expected PASS, got {result.status.value}")
     if not isinstance(result.fixes, list):
         failures.append("result.fixes is not a list")
-    if not isinstance(result.review_flags, list):
-        failures.append("result.review_flags is not a list")
+    if not isinstance(result.flags, list):
+        failures.append("result.flags is not a list")
 
     json.loads(json.dumps({
         "stage": result.name,
         "status": result.status.value,
         "fixes": [{"action": f.action, "target": f.target} for f in result.fixes],
-        "review_flags": [{"issue": r.issue, "severity": r.severity.value} for r in result.review_flags],
+        "flags": [{"issue": r.issue, "severity": r.severity.value} for r in result.flags],
     }))
 
     return {"passed": len(failures) == 0, "tests_run": 1, "failures": failures}
@@ -1195,7 +1173,7 @@ _ALL_TESTS = [
     ("pbr",         run_pbr_tests),
     ("armature",    run_armature_tests),
     ("scene",       run_scene_tests),
-    ("remediation", run_remediation_tests),
+    ("autofix", run_autofix_tests),
     ("stage5",      run_stage5_tests),
 ]
 
