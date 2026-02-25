@@ -18,19 +18,19 @@ BLENDER="${BLENDER_BIN:-/opt/blender-5.0.1-linux-x64/blender}"
 
 # -- Pure Python tests (schema, intake) ------------------------------------
 # Fast, no Blender required. Always run these first for quick feedback.
-if [[ -d "tests" ]]; then
-  echo "[asscheck] running pure-python tests..."
-  python -m pytest tests/ -v --tb=short
-fi
+echo "[asscheck] running pure-python tests..."
+python -m pytest tests/schema.py tests/intake.py -v --tb=short
 
 # -- Blender integration tests --------------------------------------------
-# Run all blender_tests in a single Blender process via run_all.py.
-# Tests skip gracefully if assets/ dir is missing.
+# Runs inside a single Blender process. Tests skip gracefully if assets/ missing.
 if [[ ! -f "$BLENDER" ]]; then
   echo "[asscheck] WARNING: Blender not found at $BLENDER — skipping integration tests" >&2
   echo "[asscheck] Set BLENDER_BIN to the blender binary path to enable them." >&2
+  sleep 10
   exit 0
 fi
 
 echo "[asscheck] running blender integration tests..."
-exec "$BLENDER" --background --python blender_tests/tests.py
+exec "$BLENDER" --background --python tests/blender.py
+
+sleep 10

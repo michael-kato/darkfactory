@@ -58,14 +58,14 @@ Used by integration tests. Skip (do not fail) if directory is missing (CI safety
 
 Test files reference assets via:
 ```python
-ASSETS_DIR = Path(__file__).parent.parent / "assets"
+ASSETS_DIR = Path(__file__).parent / "assets"
 ```
 
-### Known-Bad Assets (`assets/known-bad/`) — gitignored, procedurally generated
+### Known-Bad Assets (`tests/assets/known-bad/`) — gitignored, procedurally generated
 Minimum triangles needed to trigger exactly one check failure. No collateral errors.
 Generate or regenerate with:
 ```
-blender --background --python tools/generate_test_assets.py -- projects/asscheck/assets
+blender --background --python tools/generate_test_assets.py -- projects/asscheck/tests/assets
 ```
 
 | File | Tris | Error demonstrated |

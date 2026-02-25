@@ -1,6 +1,6 @@
 """All asscheck integration tests — runs inside Blender headless.
 
-Usage (headless):  blender --background --python blender_tests/tests.py
+Usage (headless):  blender --background --python tests/blender.py
 Usage (GUI):       Open in Blender Text Editor, press Alt+R
 
 Covers:
@@ -26,7 +26,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-ASSETS_DIR = _PROJECT_ROOT / "assets"
+ASSETS_DIR = Path(__file__).resolve().parent / "assets"
 
 import bpy          # noqa: E402
 import bmesh as _bmesh  # noqa: E402

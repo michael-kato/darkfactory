@@ -6,7 +6,7 @@ import pytest
 from pipeline.schema import Status
 from pipeline.intake import IntakeConfig, run_intake
 
-ASSETS_DIR = Path(__file__).parent.parent / "assets"
+ASSETS_DIR = Path(__file__).parent / "assets"
 
 _DEFAULT = dict(
     source="test",
