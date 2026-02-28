@@ -18,6 +18,7 @@ public struct SDFPrimitiveData
     public Vector3 emission;
 }
 
+[ExecuteInEditMode]
 public class SDFSceneManager : MonoBehaviour
 {
     [SerializeField] private int maxPrimitives = 64;
@@ -46,25 +47,45 @@ public class SDFSceneManager : MonoBehaviour
 
     public event System.Action<SDFPrimitive> OnSelectionChanged;
 
-    private void Start()
+    private void OnEnable()
     {
         _primitiveData = new SDFPrimitiveData[maxPrimitives];
         _prevPositions = new Vector3[maxPrimitives];
         
-        _primitiveBuffer = new ComputeBuffer(
-            maxPrimitives,
-            Marshal.SizeOf(typeof(SDFPrimitiveData))
-        );
+        if (_primitiveBuffer == null)
+        {
+            _primitiveBuffer = new ComputeBuffer(
+                maxPrimitives,
+                Marshal.SizeOf(typeof(SDFPrimitiveData))
+            );
+        }
 
         CollectPrimitives();
     }
 
+#if UNITY_EDITOR
+    private void Update()
+    {
+        if (!UnityEditor.EditorApplication.isPlaying)
+        {
+            CollectPrimitives();
+            UpdateBuffer();
+        }
+        else
+        {
+            CollectPrimitives();
+            UpdatePhysics();
+            UpdateBuffer();
+        }
+    }
+#else
     private void Update()
     {
         CollectPrimitives();
         UpdatePhysics();
         UpdateBuffer();
     }
+#endif
 
     private void CollectPrimitives()
     {
